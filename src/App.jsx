@@ -369,12 +369,12 @@ export default function App() {
     // =========================================================================
     // REPLACE VALUES BELOW WITH YOUR EMAILJS CREDENTIALS
     // =========================================================================
-    const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
-    const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-    const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
+    const EMAILJS_SERVICE_ID = "service_yigkhv1"; 
+    const EMAILJS_TEMPLATE_ID = "template_qgw6fb6";
+    const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
     // =========================================================================
 
-    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
+    if (EMAILJS_SERVICE_ID === "service_yigkhv1") {
         // Fallback for simulation
         alert(`[SIMULATION] Verification Code for ${targetEmail}: ${code}\n\nTo send real emails, edit App.jsx and update the EmailJS keys inside sendVerificationCode().`);
         setOtpStep('verifying');
@@ -387,9 +387,9 @@ export default function App() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                service_id: EMAILJS_SERVICE_ID,
-                template_id: EMAILJS_TEMPLATE_ID,
-                user_id: EMAILJS_PUBLIC_KEY,
+                service_id: service_yigkhv1,
+                template_id: template_qgw6fb6,
+                user_id: eCcic3_qPYVX4H6gG,
                 template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
             })
         });
