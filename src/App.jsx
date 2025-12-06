@@ -359,34 +359,77 @@ export default function App() {
   const addToRoster = async () => { if (!newName.trim()) return; try { const collectionName = rosterTab === 'staff' ? 'staff' : 'members'; let initialStart = null; if (rosterTab === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); initialStart = Timestamp.fromDate(today); } const newDoc = { name: newName.trim(), type: rosterTab === 'staff' ? 'Staff' : newType, createdAt: serverTimestamp(), membershipStart: initialStart, membershipEnd: null, membershipHistory: [], seatHistory: [], status: 'active', currentStreak: 0, notes: newNotes, birthDate: newDob ? Timestamp.fromDate(new Date(newDob)) : null, isBlocked: false, assignedSeat: newSeat ? parseInt(newSeat) : null }; if (rosterTab === 'readers' && newType === 'Single Day') { const today = new Date(); today.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(today); newDoc.membershipEnd = Timestamp.fromDate(today); newDoc.duration = singleDayDuration; } else { if (newStartDate) { const d = new Date(newStartDate); d.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(d); } if (newEndDate) { const d = new Date(newEndDate); d.setHours(12, 0, 0, 0); newDoc.membershipEnd = Timestamp.fromDate(d); } } const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), newDoc); if (newPaymentAmount) await updateDoc(docRef, { payments: [{ amount: newPaymentAmount, method: newPaymentMethod, date: Timestamp.now(), type: 'Registration' }] }); setFeedback({ type: 'success', message: `Added to list.` }); setNewName(''); setNewStartDate(''); setNewEndDate(''); setNewSeat(''); setNewDob(''); setNewNotes(''); setNewPaymentAmount(''); setNewPaymentMethod('Cash'); } catch (e) { setFeedback({ type: 'error', message: 'Could not add person.' }); } setTimeout(() => setFeedback(null), 2000); };
   
   // Settings/OTP Logic
-  const sendVerificationCode = () => {
-    if (!adminEmail) { 
-        if (emailInput) {
-            // Flow for setting up email initially
-        } else if (!appSettings.adminEmail) {
-            setFeedback({ type: 'error', message: 'Please enter an email.' }); 
-            return;
-        }
-    }
+ const sendVerificationCode = async () => {
+    let targetEmail = appSettings.adminEmail || emailInput;
+    if (!targetEmail) { setFeedback({ type: 'error', message: 'No email provided' }); return; }
+
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setOtpCode(code);
-    const targetEmail = appSettings.adminEmail || emailInput;
-    // Simulate email for now (or verify setup)
-    alert(`[SIMULATION] \nYour verification code for ${targetEmail} is:\n\n${code}\n\n(In a real app, this would be emailed)`);
-    setOtpStep('verify');
-  };
-  
-  const verifyOtp = () => { if (otpInput === otpCode) { setOtpStep('change'); setFeedback({ type: 'success', message: 'Verified!' }); } else { setFeedback({ type: 'error', message: 'Invalid Code' }); } };
-  const saveSettings = async () => {
-    if (!newPin || newPin.length !== 4) { setFeedback({ type: 'error', message: 'PIN must be 4 digits' }); return; }
+
+    // =========================================================================
+    // REPLACE VALUES BELOW WITH YOUR EMAILJS CREDENTIALS
+    // =========================================================================
+    const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+    const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+    const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
+    // =========================================================================
+
+    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
+        // Fallback for simulation
+        alert(`[SIMULATION] Verification Code for ${targetEmail}: ${code}\n\nTo send real emails, edit App.jsx and update the EmailJS keys inside sendVerificationCode().`);
+        setOtpStep('verifying');
+        return;
+    }
+
+    setFeedback({ type: 'success', message: 'Sending code...' });
     try {
-        const emailToSave = appSettings.adminEmail || emailInput;
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { adminPin: newPin, adminEmail: emailToSave }, { merge: true });
-        setFeedback({ type: 'success', message: 'Settings updated!' });
-        setAdminEmail(emailToSave); // Update local state immediately
-        setShowSettingsModal(false); setOtpStep('request'); setOtpInput(''); setNewPin(''); setEmailInput('');
-    } catch(e) { setFeedback({ type: 'error', message: 'Failed to save settings' }); }
-    setTimeout(() => setFeedback(null), 3000);
+        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                service_id: EMAILJS_SERVICE_ID,
+                template_id: EMAILJS_TEMPLATE_ID,
+                user_id: EMAILJS_PUBLIC_KEY,
+                template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
+            })
+        });
+        if (response.ok) { setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); setOtpStep('verifying'); } 
+        else { throw new Error('Email service error'); }
+    } catch (error) {
+        console.error(error);
+        alert(`[FALLBACK] Email failed to send.\nYour code is: ${code}`);
+        setOtpStep('verifying');
+    }
+  };
+
+  const handleOtpVerify = () => {
+      if (otpInput === otpCode) {
+          if (appSettings.adminEmail) {
+             setFeedback({ type: 'success', message: 'Verified! Please enter new PIN.' });
+             setOtpStep('change_pin');
+             setPinInput('');
+          } else {
+             const saveConfig = async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminEmail: emailInput }, { merge: true }); };
+             saveConfig();
+             setFeedback({ type: 'success', message: 'Email confirmed & saved!' });
+             setShowPinModal(false);
+             setIsAdmin(true);
+          }
+      } else {
+          setFeedback({ type: 'error', message: 'Invalid code' });
+      }
+  };
+
+  const handlePinChange = async () => {
+      if (pinInput.length === 4) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminPin: pinInput }, { merge: true });
+          setFeedback({ type: 'success', message: 'PIN updated successfully!' });
+          setShowPinModal(false);
+          setPinInput('');
+          setOtpStep('idle');
+      } else {
+          setFeedback({ type: 'error', message: 'PIN must be 4 digits' });
+      }
   };
   
   const downloadHistory = () => {
