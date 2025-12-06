@@ -27,18 +27,17 @@ import {
   Lock, Unlock, KeyRound, Filter, Settings, Mail, ShieldCheck, TreeDeciduous,
   Timer, BarChart3, FileText, Smile, Hand, UserMinus, UserCheck, BellRing,
   Award, Download, Moon, Zap, Ban, Cake, Sofa, CreditCard, StickyNote,
-  Loader2, MapPin, TrendingUp, PartyPopper, Send
+  Loader2, MapPin, TrendingUp, PartyPopper, Send, User, Menu, RefreshCw
 } from 'lucide-react';
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-    apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
-  authDomain: "sykia-reading-nook.firebaseapp.com",
-  projectId: "sykia-reading-nook",
-  storageBucket: "sykia-reading-nook.firebasestorage.app",
-  messagingSenderId: "100174275222",
-  appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
-  measurementId: "G-XP1YTYF7VE"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const initFirebase = () => {
@@ -346,7 +345,6 @@ export default function App() {
   const openConfirmationModal = (person, category, isCheckedIn, logId, seatNumber = null) => { const now = new Date(); setManualTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`); setUseManualTime(false); setConfirmModal({ person, category, action: isCheckedIn ? 'Check Out' : 'Check In', logId, seatNumber }); };
   
   const executeAttendanceAction = async () => { if (!confirmModal || isSubmitting) return; setIsSubmitting(true); const { person, category, action, logId, seatNumber } = confirmModal; let timestampToUse = useManualTime && manualTime ? Timestamp.fromDate(combineDateAndTime(new Date(), manualTime)) : serverTimestamp(); let originalTimestamp = useManualTime ? serverTimestamp() : null; let isManual = useManualTime; try { if (action === 'Check Out') { const updates = { checkOutTime: timestampToUse, status: 'completed', manualCheckOut: isManual }; if (isManual) updates.originalCheckOutTime = originalTimestamp; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', logId), updates); if (category !== 'staff' && person.type === 'Single Day') { try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', person.id); const archiveUpdates = { status: 'archived', archivedAt: serverTimestamp() }; if (person.assignedSeat) { archiveUpdates.assignedSeat = null; const newHistoryEntry = { seat: person.assignedSeat, leftAt: Timestamp.now() }; archiveUpdates.seatHistory = [newHistoryEntry, ...(person.seatHistory || [])]; } await updateDoc(memberRef, archiveUpdates); } catch (e) { console.error("Auto-archive failed", e); } } setWelcomeScreen({ type: 'check-out', name: person.name }); } else { const newDoc = { memberName: person.name, memberType: person.type || 'Staff', category, dateString: todayStr, checkInTime: timestampToUse, checkOutTime: null, status: 'active', manualCheckIn: isManual, seatNumber: seatNumber ? parseInt(seatNumber) : null }; if (isManual) newDoc.originalCheckInTime = originalTimestamp; await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance_logs'), newDoc); try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', category === 'staff' ? 'staff' : 'members', person.id); const lastCheckIn = person.lastCheckInDate ? person.lastCheckInDate.toDate() : null; const today = new Date(); today.setHours(0,0,0,0); let newStreak = person.currentStreak || 0; if (lastCheckIn) { lastCheckIn.setHours(0,0,0,0); const diffDays = Math.ceil(Math.abs(today - lastCheckIn) / (1000 * 60 * 60 * 24)); const isSundaySkip = (diffDays === 2 && today.getDay() === 1 && lastCheckIn.getDay() === 6); if (diffDays === 1 || isSundaySkip) newStreak += 1; else if (diffDays > 1) newStreak = 1; } else newStreak = 1; await updateDoc(memberRef, { lastCheckInDate: serverTimestamp(), currentStreak: newStreak }); } catch (e) {} 
-  // FIX: Detect birthday and pass to Welcome Screen state
   setWelcomeScreen({ type: 'check-in', name: person.name, isBirthday: isBirthday(person.birthDate) }); } } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } finally { setIsSubmitting(false); setConfirmModal(null); setTimeout(() => setWelcomeScreen(null), 3000); } };
   const saveLogEdit = async () => { if (!editLogModal) return; try { const originalDate = (editLogModal.checkInTime && editLogModal.checkInTime.toDate) ? editLogModal.checkInTime.toDate() : new Date(); const updates = { isEdited: true }; if (!editLogModal.originalCheckInTime && editLogModal.checkInTime) updates.originalCheckInTime = editLogModal.checkInTime; if (!editLogModal.originalCheckOutTime && editLogModal.checkOutTime) updates.originalCheckOutTime = editLogModal.checkOutTime; if (editLogModal.editCheckIn !== undefined && editLogModal.editCheckIn !== '') { updates.checkInTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckIn)); } if (editLogModal.editCheckOut) { updates.checkOutTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckOut)); updates.status = 'completed'; } else if (editLogModal.editCheckOut === '') { updates.checkOutTime = null; updates.status = 'active'; } await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', editLogModal.id), updates); setFeedback({ type: 'success', message: 'Record updated.' }); setEditLogModal(null); } catch (e) { setFeedback({ type: 'error', message: 'Failed to update.' }); } setTimeout(() => setFeedback(null), 3000); };
   const openEditMember = (person, category) => { setEditMemberModal({ ...person, category: category || 'student', editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '', }); };
@@ -359,7 +357,7 @@ export default function App() {
   const addToRoster = async () => { if (!newName.trim()) return; try { const collectionName = rosterTab === 'staff' ? 'staff' : 'members'; let initialStart = null; if (rosterTab === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); initialStart = Timestamp.fromDate(today); } const newDoc = { name: newName.trim(), type: rosterTab === 'staff' ? 'Staff' : newType, createdAt: serverTimestamp(), membershipStart: initialStart, membershipEnd: null, membershipHistory: [], seatHistory: [], status: 'active', currentStreak: 0, notes: newNotes, birthDate: newDob ? Timestamp.fromDate(new Date(newDob)) : null, isBlocked: false, assignedSeat: newSeat ? parseInt(newSeat) : null }; if (rosterTab === 'readers' && newType === 'Single Day') { const today = new Date(); today.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(today); newDoc.membershipEnd = Timestamp.fromDate(today); newDoc.duration = singleDayDuration; } else { if (newStartDate) { const d = new Date(newStartDate); d.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(d); } if (newEndDate) { const d = new Date(newEndDate); d.setHours(12, 0, 0, 0); newDoc.membershipEnd = Timestamp.fromDate(d); } } const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), newDoc); if (newPaymentAmount) await updateDoc(docRef, { payments: [{ amount: newPaymentAmount, method: newPaymentMethod, date: Timestamp.now(), type: 'Registration' }] }); setFeedback({ type: 'success', message: `Added to list.` }); setNewName(''); setNewStartDate(''); setNewEndDate(''); setNewSeat(''); setNewDob(''); setNewNotes(''); setNewPaymentAmount(''); setNewPaymentMethod('Cash'); } catch (e) { setFeedback({ type: 'error', message: 'Could not add person.' }); } setTimeout(() => setFeedback(null), 2000); };
   
   // Settings/OTP Logic
- const sendVerificationCode = async () => {
+  const sendVerificationCode = async () => {
     let targetEmail = appSettings.adminEmail || emailInput;
     if (!targetEmail) { setFeedback({ type: 'error', message: 'No email provided' }); return; }
 
@@ -369,9 +367,9 @@ export default function App() {
     // =========================================================================
     // REPLACE VALUES BELOW WITH YOUR EMAILJS CREDENTIALS
     // =========================================================================
-    const EMAILJS_SERVICE_ID = "service_yigkhv1"; 
-    const EMAILJS_TEMPLATE_ID = "template_qgw6fb6";
-    const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
+    const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+    const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+    const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
     // =========================================================================
 
     if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
@@ -404,8 +402,18 @@ export default function App() {
 
   const handleOtpVerify = () => {
       if (otpInput === otpCode) {
-          setOtpStep('change');
-          setFeedback({ type: 'success', message: 'Verified!' });
+          if (appSettings.adminEmail) {
+             setFeedback({ type: 'success', message: 'Verified! Please enter new PIN.' });
+             setOtpStep('change');
+             setPinInput('');
+             setEmailInput(appSettings.adminEmail); // Pre-fill email for editing
+          } else {
+             const saveConfig = async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminEmail: emailInput }, { merge: true }); };
+             saveConfig();
+             setFeedback({ type: 'success', message: 'Email confirmed & saved!' });
+             setShowPinModal(false);
+             setIsAdmin(true);
+          }
       } else {
           setFeedback({ type: 'error', message: 'Invalid code' });
       }
@@ -785,11 +793,18 @@ export default function App() {
                        
                        {appSettings.adminEmail ? (
                            <>
-                             <p className="text-sm text-stone-500 dark:text-stone-400">To change the PIN, we need to verify it's you. Send a code to:</p>
+                             <p className="text-sm text-stone-500 dark:text-stone-400">To change settings, we need to verify it's you. Send a code to:</p>
                              <div className="font-mono text-sm bg-stone-100 dark:bg-stone-800 py-2 rounded-lg text-stone-700 dark:text-stone-300">
                                 {appSettings.adminEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3")}
                              </div>
                              <button onClick={sendVerificationCode} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"><Mail size={16} /> Send Verification Code</button>
+                             {/* ADDED: Option to change email if the current one is wrong/inaccessible */}
+                             <button 
+                                onClick={() => setAppSettings({ ...appSettings, adminEmail: '' })} 
+                                className="text-xs text-stone-400 hover:text-blue-500 underline transition-colors"
+                             >
+                                Incorrect Email? Reset it here.
+                             </button>
                            </>
                        ) : (
                            <>
@@ -806,7 +821,7 @@ export default function App() {
                         <h4 className="font-bold text-lg text-stone-800 dark:text-white">Enter OTP</h4>
                         <p className="text-sm text-stone-500 dark:text-stone-400">Enter the 6-digit code sent to your email.</p>
                         <input type="text" value={otpInput} onChange={(e) => setOtpInput(e.target.value)} maxLength={6} placeholder="000000" className="w-full px-3 py-3 border-2 border-stone-200 dark:border-stone-700 rounded-xl outline-none focus:border-blue-500 dark:bg-stone-800 dark:text-white text-center text-2xl font-mono tracking-widest" />
-                        <button onClick={verifyOtp} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">Verify</button>
+                        <button onClick={handleOtpVerify} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">Verify</button>
                     </div>
                  )}
 
@@ -815,13 +830,8 @@ export default function App() {
                         <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-lg text-xs font-bold text-center mb-4">Identity Verified</div>
                         <div>
                             <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Update Admin Email</label>
-                            {/* FIX: Remove "|| appSettings.adminEmail" from value so it can be edited */}
-                            <input 
-                                type="email" 
-                                value={emailInput} 
-                                onChange={(e) => setEmailInput(e.target.value)} 
-                                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" 
-                            />
+                            {/* FIX: Removed the fallback to appSettings.adminEmail which prevented clearing the input */}
+                            <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-stone-500 uppercase mb-1">New PIN (4 Digits)</label>
@@ -1032,46 +1042,38 @@ export default function App() {
         </div>
       )}
 
-      {/* WELCOME SCREEN WITH BIRTHDAY LOGIC */}
+      {/* Welcome Screen with Birthday */}
       {welcomeScreen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300">
-           {/* Confetti (Only on Birthday) */}
            {welcomeScreen.isBirthday && (
               <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                   {[...Array(50)].map((_, i) => (
-                    <div
-                        key={i}
-                        className="absolute w-2 h-2 rounded-full"
-                        style={{
-                            left: `${Math.random() * 100}%`,
-                            top: `-10px`,
-                            backgroundColor: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'][Math.floor(Math.random() * 6)],
-                            animation: `confetti-fall ${Math.random() * 3 + 2}s linear forwards`,
-                            animationDelay: `${Math.random() * 2}s`
-                        }}
-                    />
+                    <div key={i} className="absolute w-3 h-3 rounded-sm" style={{ left: `${Math.random() * 100}%`, top: `-20px`, backgroundColor: ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#ec4899', '#a855f7'][Math.floor(Math.random() * 6)], animation: `confetti-fall ${Math.random() * 2 + 3}s linear forwards`, animationDelay: `${Math.random() * 1.5}s`, opacity: 0.8 }} />
                   ))}
               </div>
            )}
            <div className="relative bg-white dark:bg-stone-900 rounded-3xl shadow-2xl p-8 w-[90%] max-w-sm text-center overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 border border-stone-200 dark:border-stone-700 z-10">
               <div className="relative z-10 mt-4">
-                 <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white dark:ring-stone-800 ${welcomeScreen.type === 'check-in' ? (welcomeScreen.isBirthday ? 'bg-pink-100 text-pink-600 animate-bounce' : 'bg-[#eef2e2] text-[#4a5d23]') : 'bg-amber-100 text-amber-600'}`}>
-                    {welcomeScreen.type === 'check-in' ? (welcomeScreen.isBirthday ? <Cake size={48} /> : <Hand size={48} />) : <Smile size={48} />}
-                 </div>
-                 <h2 className="text-2xl font-extrabold text-stone-800 dark:text-white mb-2 tracking-tight leading-tight">
-                    {welcomeScreen.type === 'check-in' ? 'Welcome to SYKiA! 🌿' : 'Have a Wonderful Day! ☀️'}
-                 </h2>
+                 <div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white dark:ring-stone-800 ${welcomeScreen.type === 'check-in' ? (welcomeScreen.isBirthday ? 'bg-pink-100 text-pink-600 animate-bounce' : 'bg-[#eef2e2] text-[#4a5d23]') : 'bg-amber-100 text-amber-600'}`}>{welcomeScreen.type === 'check-in' ? (welcomeScreen.isBirthday ? <Cake size={48} /> : <Hand size={48} />) : <Smile size={48} />}</div>
+                 <h2 className="text-2xl font-extrabold text-stone-800 dark:text-white mb-2 tracking-tight leading-tight">{welcomeScreen.type === 'check-in' ? 'Welcome to SYKiA! 🌿' : 'Have a Wonderful Day! ☀️'}</h2>
                  <p className="text-xl font-medium text-stone-600 dark:text-stone-300 mb-2">{welcomeScreen.name}</p>
-                 
-                 {/* Birthday Message */}
                  {welcomeScreen.isBirthday && (
-                    <div className="mt-4 animate-in zoom-in duration-500">
-                        <span className="inline-block bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold px-4 py-1 rounded-full text-sm shadow-lg transform rotate-1">
-                            🎉 Happy Birthday! 🎂
-                        </span>
+                    <div className="mt-6 pt-6 border-t border-stone-100 dark:border-stone-800 animate-in slide-in-from-bottom-4 duration-700 flex flex-col items-center gap-2">
+                        <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 animate-pulse tracking-wide drop-shadow-sm">HAPPY BIRTHDAY!</h3>
+                        <p className="text-sm text-stone-500 dark:text-stone-400 font-medium">Wishing you a fantastic year ahead! 🎂✨</p>
                     </div>
                  )}
               </div>
+           </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+              <h3 className="text-lg font-bold text-center mb-2 text-red-600">Delete {deleteModal.name}?</h3>
+              <p className="text-center text-stone-500 mb-6 text-sm">This action cannot be undone.</p>
+              <div className="flex gap-2"><button onClick={() => setDeleteModal(null)} className="flex-1 py-3 text-stone-500 font-bold hover:bg-stone-100 rounded-xl">Cancel</button><button onClick={executeDeletePerson} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-600/20">Delete</button></div>
            </div>
         </div>
       )}
