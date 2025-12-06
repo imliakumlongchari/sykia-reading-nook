@@ -404,32 +404,23 @@ export default function App() {
 
   const handleOtpVerify = () => {
       if (otpInput === otpCode) {
-          if (appSettings.adminEmail) {
-             setFeedback({ type: 'success', message: 'Verified! Please enter new PIN.' });
-             setOtpStep('change_pin');
-             setPinInput('');
-          } else {
-             const saveConfig = async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminEmail: emailInput }, { merge: true }); };
-             saveConfig();
-             setFeedback({ type: 'success', message: 'Email confirmed & saved!' });
-             setShowPinModal(false);
-             setIsAdmin(true);
-          }
+          setOtpStep('change');
+          setFeedback({ type: 'success', message: 'Verified!' });
       } else {
           setFeedback({ type: 'error', message: 'Invalid code' });
       }
   };
 
-  const handlePinChange = async () => {
-      if (pinInput.length === 4) {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminPin: pinInput }, { merge: true });
-          setFeedback({ type: 'success', message: 'PIN updated successfully!' });
-          setShowPinModal(false);
-          setPinInput('');
-          setOtpStep('idle');
-      } else {
-          setFeedback({ type: 'error', message: 'PIN must be 4 digits' });
-      }
+  const saveSettings = async () => {
+    if (!newPin || newPin.length !== 4) { setFeedback({ type: 'error', message: 'PIN must be 4 digits' }); return; }
+    try {
+        const emailToSave = emailInput || appSettings.adminEmail; // Use new input if provided, else keep old
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { adminPin: newPin, adminEmail: emailToSave }, { merge: true });
+        setFeedback({ type: 'success', message: 'Settings updated!' });
+        setAdminEmail(emailToSave); // Update local state immediately
+        setShowSettingsModal(false); setOtpStep('request'); setOtpInput(''); setNewPin(''); setEmailInput('');
+    } catch(e) { setFeedback({ type: 'error', message: 'Failed to save settings' }); }
+    setTimeout(() => setFeedback(null), 3000);
   };
   
   const downloadHistory = () => {
