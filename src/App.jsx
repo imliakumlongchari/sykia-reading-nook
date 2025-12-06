@@ -32,13 +32,12 @@ import {
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
-  authDomain: "sykia-reading-nook.firebaseapp.com",
-  projectId: "sykia-reading-nook",
-  storageBucket: "sykia-reading-nook.firebasestorage.app",
-  messagingSenderId: "100174275222",
-  appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
-  measurementId: "G-XP1YTYF7VE"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const initFirebase = () => {
@@ -83,7 +82,6 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
   const origIn = log.originalCheckInTime ? formatTime(log.originalCheckInTime) : null;
   const origOut = log.originalCheckOutTime ? formatTime(log.originalCheckOutTime) : null;
   const showOriginalBox = (log.originalCheckInTime || log.originalCheckOutTime);
-  const status = member ? getMemberStatus(member, log.category) : 'Unknown';
   
   let displayDuration = '0m';
   let isLive = false;
@@ -99,9 +97,9 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
       } catch(e) {}
   }
 
+  const isExpired = member && getMemberStatus(member, log.category) === 'Expired';
   const daysLeft = member ? getDaysRemaining(member.membershipEnd) : null;
-  const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && status === 'Active';
-  const isExpired = status === 'Expired';
+  const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && !isExpired;
 
   return (
     <div className="p-4 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors flex items-center justify-between border-b border-stone-100 dark:border-stone-800 last:border-0 group">
@@ -313,6 +311,7 @@ export default function App() {
   
   const executeAttendanceAction = async () => { if (!confirmModal || isSubmitting) return; setIsSubmitting(true); const { person, category, action, logId, seatNumber } = confirmModal; let timestampToUse = useManualTime && manualTime ? Timestamp.fromDate(combineDateAndTime(new Date(), manualTime)) : serverTimestamp(); let originalTimestamp = useManualTime ? serverTimestamp() : null; let isManual = useManualTime; try { if (action === 'Check Out') { const updates = { checkOutTime: timestampToUse, status: 'completed', manualCheckOut: isManual }; if (isManual) updates.originalCheckOutTime = originalTimestamp; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', logId), updates); if (category !== 'staff' && person.type === 'Single Day') { try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', person.id); const archiveUpdates = { status: 'archived', archivedAt: serverTimestamp() }; if (person.assignedSeat) { archiveUpdates.assignedSeat = null; const newHistoryEntry = { seat: person.assignedSeat, leftAt: Timestamp.now() }; archiveUpdates.seatHistory = [newHistoryEntry, ...(person.seatHistory || [])]; } await updateDoc(memberRef, archiveUpdates); } catch (e) { console.error("Auto-archive failed", e); } } setWelcomeScreen({ type: 'check-out', name: person.name }); } else { const newDoc = { memberName: person.name, memberType: person.type || 'Staff', category, dateString: todayStr, checkInTime: timestampToUse, checkOutTime: null, status: 'active', manualCheckIn: isManual, seatNumber: seatNumber ? parseInt(seatNumber) : null }; if (isManual) newDoc.originalCheckInTime = originalTimestamp; await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance_logs'), newDoc); try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', category === 'staff' ? 'staff' : 'members', person.id); const lastCheckIn = person.lastCheckInDate ? person.lastCheckInDate.toDate() : null; const today = new Date(); today.setHours(0,0,0,0); let newStreak = person.currentStreak || 0; if (lastCheckIn) { lastCheckIn.setHours(0,0,0,0); const diffDays = Math.ceil(Math.abs(today - lastCheckIn) / (1000 * 60 * 60 * 24)); const isSundaySkip = (diffDays === 2 && today.getDay() === 1 && lastCheckIn.getDay() === 6); if (diffDays === 1 || isSundaySkip) newStreak += 1; else if (diffDays > 1) newStreak = 1; } else newStreak = 1; await updateDoc(memberRef, { lastCheckInDate: serverTimestamp(), currentStreak: newStreak }); } catch (e) {} setWelcomeScreen({ type: 'check-in', name: person.name }); } } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } finally { setIsSubmitting(false); setConfirmModal(null); setTimeout(() => setWelcomeScreen(null), 1900); } };
   const saveLogEdit = async () => { if (!editLogModal) return; try { const originalDate = (editLogModal.checkInTime && editLogModal.checkInTime.toDate) ? editLogModal.checkInTime.toDate() : new Date(); const updates = { isEdited: true }; if (!editLogModal.originalCheckInTime && editLogModal.checkInTime) updates.originalCheckInTime = editLogModal.checkInTime; if (!editLogModal.originalCheckOutTime && editLogModal.checkOutTime) updates.originalCheckOutTime = editLogModal.checkOutTime; if (editLogModal.editCheckIn !== undefined && editLogModal.editCheckIn !== '') { updates.checkInTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckIn)); } if (editLogModal.editCheckOut) { updates.checkOutTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckOut)); updates.status = 'completed'; } else if (editLogModal.editCheckOut === '') { updates.checkOutTime = null; updates.status = 'active'; } await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', editLogModal.id), updates); setFeedback({ type: 'success', message: 'Record updated.' }); setEditLogModal(null); } catch (e) { setFeedback({ type: 'error', message: 'Failed to update.' }); } setTimeout(() => setFeedback(null), 3000); };
+  
   const openEditMember = (person, category) => { setEditMemberModal({ ...person, category: category || 'student', editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '' }); };
   const openMemberHistory = (person) => { setEditMemberModal({ ...person, category: 'student', editName: person.name, editType: person.type, editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], mode: 'history' }); };
   const openRestoreMember = (person) => { const category = (person.type === 'Staff' || rosterTab === 'ex_staff') ? 'staff' : 'student'; setEditMemberModal({ ...person, category, editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '', mode: 'restore' }); };
@@ -500,6 +499,25 @@ export default function App() {
                      const isCheckedIn = statusObj?.status === 'checked-in';
                      let liveDuration = null;
                      if (isCheckedIn && statusObj?.startTime) { const start = statusObj.startTime.toDate ? statusObj.startTime.toDate() : new Date(statusObj.startTime); liveDuration = formatDurationString(now - start); }
+                     
+                     const statusLabel = getMemberStatus(person, (rosterTab === 'staff' || rosterTab === 'ex_staff') ? 'staff' : 'student');
+                     const isActive = statusLabel === 'Active';
+                     const isExpired = statusLabel === 'Expired';
+                     const isUpcoming = statusLabel === 'Upcoming';
+                     const daysLeft = getDaysRemaining(person.membershipEnd);
+                     const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && !isExpired;
+                     
+                     // FIX: Strict Date Logic for Renew Button
+                     const isRenewable = (() => {
+                         if (!person.membershipEnd || person.status === 'archived' || person.pendingRenewal) return false;
+                         const today = new Date();
+                         today.setHours(0,0,0,0);
+                         const end = person.membershipEnd.toDate ? person.membershipEnd.toDate() : new Date(person.membershipEnd);
+                         end.setHours(0,0,0,0);
+                         // Only renewable if TODAY >= End Date (i.e. Expired or Expires Today)
+                         return today.getTime() >= end.getTime();
+                     })();
+
                      return (
                         <div key={person.id} className="p-4 flex items-center justify-between hover:bg-stone-50 dark:hover:bg-stone-800">
                            <div className="flex items-center gap-4">
@@ -507,7 +525,7 @@ export default function App() {
                               <div><div className="font-semibold text-stone-800 dark:text-stone-200 text-base">{person.name} {isCheckedIn && <span className="inline-flex ml-2 text-[10px] bg-stone-800 text-white px-2 py-0.5 rounded-full font-bold">Present {liveDuration && `(${liveDuration})`}</span>}</div><div className="text-xs text-stone-400 dark:text-stone-500">{person.type}</div></div>
                            </div>
                            <div className="flex items-center gap-2">
-                              {(rosterTab === 'readers') && <button onClick={() => openRenewMember(person)} className="p-3 text-[#4a5d23] hover:bg-[#eef2e2]"><RotateCcw size={18}/></button>}
+                              {(rosterTab === 'readers') && <button onClick={() => isRenewable && openRenewMember(person)} disabled={!isRenewable} className={`p-3 transition-colors ${isRenewable ? 'text-[#4a5d23] hover:bg-[#eef2e2]' : 'text-stone-200 cursor-not-allowed'}`}><RotateCcw size={18}/></button>}
                               {(rosterTab !== 'archived' && rosterTab !== 'ex_staff') ? <button onClick={() => openEditMember(person)} className="p-3 text-stone-300 hover:text-blue-500"><Edit2 size={18}/></button> : <button onClick={() => openRestoreMember(person)} className="p-3 text-stone-300 hover:text-green-500"><UserCheck size={18}/></button>}
                               <button onClick={() => setDeleteModal({ id: person.id, name: person.name, category: (rosterTab === 'staff' || rosterTab === 'ex_staff') ? 'staff' : 'student' })} className="p-3 text-stone-300 hover:text-red-500"><Trash2 size={18}/></button>
                            </div>
@@ -600,13 +618,13 @@ export default function App() {
                         const isAfternoonCheckedIn = afternoon && todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum && l.memberName === afternoon.name);
                         return (
                            <div key={seatNum} className="aspect-square rounded-xl flex flex-col border-2 border-stone-300 dark:border-stone-700 overflow-hidden relative bg-white dark:bg-stone-900">
-                              <button onClick={() => morning && handlePersonClick(morning, 'student')} disabled={!morning} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isMorningCheckedIn ? 'bg-[#c9db93]' : (isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
+                              <button onClick={() => morning && handlePersonClick(morning, 'student')} disabled={!morning} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isMorningCheckedIn ? 'bg-[#c9db93] dark:bg-[#4a5d23]/40' : (isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
                                  {morning ? (<><div className="flex items-center justify-center gap-1 w-full"><span className="text-[8px] font-bold text-stone-500 uppercase tracking-tighter shrink-0">AM</span><span className={`text-[11px] font-bold truncate ${isMorningCheckedIn ? 'text-white drop-shadow-sm' : 'text-stone-700 dark:text-stone-200'}`}>{morning.name}</span></div>{getMemberStatus(morning, 'student') === 'Upcoming' && <span className="text-[8px] text-blue-500 font-medium leading-none mt-0.5">{formatDateShort(morning.membershipStart)}</span>}</>) : <span className="text-[9px] font-medium text-stone-400 uppercase tracking-wide">Empty</span>}
                               </button>
                               <div className="h-px bg-stone-300 dark:bg-stone-700 w-full relative z-10">
                                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-200 dark:bg-yellow-900/40 px-1.5 py-px rounded-full border border-yellow-300 dark:border-yellow-700 text-[9px] text-yellow-800 dark:text-yellow-200 font-extrabold shadow-sm select-none">{seatNum}</div>
                               </div>
-                              <button onClick={() => afternoon && handlePersonClick(afternoon, 'student')} disabled={!afternoon} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isAfternoonCheckedIn ? 'bg-[#c9db93]' : (!isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
+                              <button onClick={() => afternoon && handlePersonClick(afternoon, 'student')} disabled={!afternoon} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isAfternoonCheckedIn ? 'bg-[#c9db93] dark:bg-[#4a5d23]/40' : (!isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
                                  {afternoon ? (<><div className="flex items-center justify-center gap-1 w-full"><span className="text-[8px] font-bold text-stone-500 uppercase tracking-tighter shrink-0">PM</span><span className={`text-[11px] font-bold truncate ${isAfternoonCheckedIn ? 'text-white drop-shadow-sm' : 'text-stone-700 dark:text-stone-200'}`}>{afternoon.name}</span></div>{getMemberStatus(afternoon, 'student') === 'Upcoming' && <span className="text-[8px] text-blue-500 font-medium leading-none mt-0.5">{formatDateShort(afternoon.membershipStart)}</span>}</>) : <span className="text-[9px] font-medium text-stone-400 uppercase tracking-wide">Empty</span>}
                               </button>
                            </div>
@@ -625,7 +643,7 @@ export default function App() {
 
       {/* FIX: RESTORED DELETE MODAL */}
       {deleteModal && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
               <div className="p-6 text-center">
                  <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 size={32} /></div>
@@ -639,24 +657,155 @@ export default function App() {
            </div>
         </div>
       )}
+      
+      {/* FIX: RESTORED CONFIRM MODAL WITH Z-INDEX > 200 */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                 <h3 className="text-xl font-bold text-stone-800 dark:text-white mb-2">{confirmModal.action}</h3>
+                 <p className="text-stone-500 dark:text-stone-400 mb-4">{confirmModal.person.name}</p>
+                 {confirmModal.seatNumber && <div className="mb-4 inline-block bg-[#eef2e2] dark:bg-[#4a5d23]/30 text-[#4a5d23] dark:text-[#a3b86c] px-3 py-1 rounded-full font-bold text-sm">Assigned Seat: {confirmModal.seatNumber}</div>}
+                 <div className="mb-4 flex flex-col items-center justify-center">
+                    {!useManualTime ? (
+                       <button onClick={() => setUseManualTime(true)} className="text-xs font-bold text-blue-500 hover:text-blue-700 underline">Change Time?</button>
+                    ) : (
+                       <div className="bg-stone-100 dark:bg-stone-800 p-2 rounded-lg border border-stone-200 dark:border-stone-700 animate-in fade-in"><label className="text-[10px] font-bold text-stone-400 uppercase block mb-1">Set {confirmModal.action} Time</label><input type="time" value={manualTime} onChange={(e) => setManualTime(e.target.value)} className="font-mono text-lg font-bold bg-white dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded px-2 py-1 text-stone-800 dark:text-white text-center"/></div>
+                    )}
+                 </div>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setConfirmModal(null)} disabled={isSubmitting} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl disabled:opacity-50">Cancel</button>
+                    <button type="button" onClick={executeAttendanceAction} disabled={isSubmitting} className="py-3 font-bold text-white bg-[#4a5d23] hover:bg-[#3b4a1c] rounded-xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-70">{isSubmitting && <Loader2 size={16} className="animate-spin" />} Confirm</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {editLogModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+             <div className="p-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-800/50">
+               <h3 className="font-bold text-stone-800 dark:text-white">Edit Record</h3>
+               <button onClick={() => setEditLogModal(null)} className="text-stone-400 hover:text-stone-600"><X size={20} /></button>
+             </div>
+             {(editLogModal.originalCheckInTime || editLogModal.originalCheckOutTime) && (
+               <div className="bg-amber-50 dark:bg-amber-900/20 p-4 border-b border-amber-100 dark:border-amber-900/30 flex items-start gap-3">
+                 <Info size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                 <div><div className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase mb-1">Original Record</div><div className="text-sm text-amber-800 dark:text-amber-300 font-mono">In: {editLogModal.originalCheckInTime ? formatTime(editLogModal.originalCheckInTime) : 'N/A'}<br/>Out: {editLogModal.originalCheckOutTime ? formatTime(editLogModal.originalCheckOutTime) : 'Pending'}</div></div>
+               </div>
+             )}
+             <div className="p-6 space-y-4">
+               <div><div className="text-sm font-bold text-stone-800 dark:text-white mb-1">{editLogModal.memberName}</div><div className="text-xs text-stone-500 dark:text-stone-400">{formatDateStringHeader(editLogModal.dateString)}</div></div>
+               <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Check In Time</label><input type="time" value={editLogModal.editCheckIn !== undefined ? editLogModal.editCheckIn : getTimeStringFromTimestamp(editLogModal.checkInTime)} onChange={(e) => setEditLogModal({...editLogModal, editCheckIn: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-3 font-mono text-lg"/></div>
+               <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Check Out Time</label><input type="time" value={editLogModal.editCheckOut !== undefined ? editLogModal.editCheckOut : getTimeStringFromTimestamp(editLogModal.checkOutTime)} onChange={(e) => setEditLogModal({...editLogModal, editCheckOut: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-3 font-mono text-lg"/><div className="text-[10px] text-stone-400 mt-1">Clear check out time to reopen session</div></div>
+             </div>
+             <div className="p-4 bg-stone-50 dark:bg-stone-800/50 flex justify-end"><button onClick={saveLogEdit} className="bg-[#4a5d23] text-white px-6 py-2 rounded-xl font-bold hover:bg-[#3b4a1c] flex items-center gap-2"><Save size={16} /> Save Changes</button></div>
+           </div>
+        </div>
+      )}
 
       {editMemberModal && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[95%] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
              <div className="p-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-800/50">
                <h3 className="font-bold text-stone-800 dark:text-white">{editMemberModal.mode === 'restore' ? 'Restore Member' : 'Edit Member'}</h3>
                <button onClick={() => setEditMemberModal(null)} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
              </div>
              <div className="p-6 space-y-4 overflow-y-auto">
-                 <div><label className="block text-sm font-bold text-stone-500 uppercase mb-1">Name</label><input type="text" value={editMemberModal.editName} onChange={(e) => setEditMemberModal({...editMemberModal, editName: e.target.value})} className="w-full border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-3 text-base"/></div>
-                 <div className="flex justify-end pt-4"><button onClick={saveMemberUpdate} className="bg-[#4a5d23] text-white px-6 py-3 rounded-xl font-bold text-base hover:bg-[#3b4a1c] w-full sm:w-auto">Save Changes</button></div>
+               <div className="grid grid-cols-2 gap-3">
+                 <div className={(editMemberModal.category === 'student' && editMemberModal.editType === 'Single Day') ? "col-span-2" : "col-span-1"}>
+                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Name</label>
+                    <input type="text" value={editMemberModal.editName} onChange={(e) => setEditMemberModal({...editMemberModal, editName: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm" disabled={editMemberModal.mode === 'history'}/>
+                 </div>
+                 {(editMemberModal.category !== 'student' || editMemberModal.editType !== 'Single Day') && (
+                    <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Birthday</label><input type="date" value={editMemberModal.editDob || ''} onChange={(e) => setEditMemberModal({...editMemberModal, editDob: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm" disabled={editMemberModal.mode === 'history'}/></div>
+                 )}
+               </div>
+               <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Notes (Staff Only)</label><textarea value={editMemberModal.editNotes} onChange={(e) => setEditMemberModal({...editMemberModal, editNotes: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm h-20 resize-none" placeholder="Exam prep details, preferences, etc." disabled={editMemberModal.mode === 'history'}/></div>
+               {editMemberModal.mode !== 'history' && (
+                  <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/30">
+                     <div className={`w-10 h-6 rounded-full p-1 cursor-pointer transition-colors ${editMemberModal.editIsBlocked ? 'bg-red-500' : 'bg-stone-300'}`} onClick={() => setEditMemberModal({...editMemberModal, editIsBlocked: !editMemberModal.editIsBlocked})}><div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${editMemberModal.editIsBlocked ? 'translate-x-4' : ''}`}></div></div>
+                     <span className="text-sm font-bold text-red-700 dark:text-red-400">Block from Check-in</span>
+                  </div>
+               )}
+               {editMemberModal.mode !== 'history' && editMemberModal.category === 'student' && (
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                     <div className="text-xs font-bold text-indigo-500 uppercase mb-2 flex items-center gap-1"><CreditCard size={12} /> Payment Info (Optional)</div>
+                     <div className="grid grid-cols-2 gap-3">
+                        <input type="number" placeholder="Amount" value={editMemberModal.paymentAmount} onChange={(e) => setEditMemberModal({...editMemberModal, paymentAmount: e.target.value})} className="w-full border border-indigo-200 dark:border-indigo-800 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm"/>
+                        <select value={editMemberModal.paymentMethod} onChange={(e) => setEditMemberModal({...editMemberModal, paymentMethod: e.target.value})} className="w-full border border-indigo-200 dark:border-indigo-800 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm"><option>Cash</option><option>UPI</option><option>Card</option></select>
+                     </div>
+                  </div>
+               )}
+               
+               {/* FIX: FULLY RESTORED MEMBERSHIP CONFIGURATION (SEAT, TYPE, DATES) */}
+               {(editMemberModal.category === 'student' || editMemberModal.category === 'staff') && (
+                  <div className="mt-4">
+                     {editMemberModal.category === 'student' && (
+                         <div className="grid grid-cols-3 gap-2 mb-4">
+                           {['Full Day', 'Morning Shift', 'Afternoon Shift', 'Single Day', 'Weekly'].map(type => (<button key={type} type="button" onClick={() => editMemberModal.mode !== 'history' && setEditMemberModal({...editMemberModal, editType: type})} disabled={editMemberModal.mode === 'history'} className={`px-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${editMemberModal.editType === type ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'border-stone-200 dark:border-stone-700 text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800'}`}>{type}</button>))}
+                         </div>
+                     )}
+                     <div className="mb-4">
+                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Assigned Seat (Permanent)</label>
+                        <select value={editMemberModal.editAssignedSeat || ''} onChange={(e) => setEditMemberModal({...editMemberModal, editAssignedSeat: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm" disabled={editMemberModal.mode === 'history'}>
+                          <option value="">No Assigned Seat</option>
+                          {[...Array(TOTAL_SEATS)].map((_, i) => {
+                             const seatNum = i + 1;
+                             const checkType = editMemberModal.category === 'staff' ? 'Staff' : editMemberModal.editType;
+                             const { available, reason } = getSeatStatus(seatNum, checkType, editMemberModal.id);
+                             return (<option key={seatNum} value={seatNum} disabled={!available} className={!available ? "text-gray-400 bg-gray-100" : ""}>Seat {seatNum} {!available ? `(${reason})` : ''}</option>);
+                          })}
+                        </select>
+                     </div>
+                     <div className="grid grid-cols-2 gap-3">
+                       <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">{editMemberModal.category === 'staff' ? 'Date of Joining' : 'Start Date'}</label><input type="date" value={editMemberModal.editStartDate || ''} onChange={(e) => setEditMemberModal({...editMemberModal, editStartDate: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm" disabled={editMemberModal.mode === 'history'}/></div>
+                       <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">{editMemberModal.category === 'staff' ? 'Date of Leaving' : 'End Date'}</label><input type="date" value={editMemberModal.editEndDate || ''} onChange={(e) => setEditMemberModal({...editMemberModal, editEndDate: e.target.value})} className="w-full border border-stone-200 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-2 text-sm" disabled={editMemberModal.mode === 'history'}/></div>
+                     </div>
+                  </div>
+               )}
+               
+               {editMemberModal.seatHistory && editMemberModal.seatHistory.length > 0 && (
+                  <div className="mt-6 border-t border-stone-100 dark:border-stone-800 pt-4">
+                      <h4 className="text-xs font-bold text-stone-500 dark:text-stone-400 uppercase mb-3 flex items-center gap-2"><MapPin size={14} /> Previous Seats</h4>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {[...editMemberModal.seatHistory].sort((a, b) => (b.leftAt?.seconds || 0) - (a.leftAt?.seconds || 0)).map((hist, i) => (
+                              <div key={i} className="bg-stone-50 dark:bg-stone-800/50 p-2.5 rounded-lg border border-stone-200 dark:border-stone-700 flex justify-between items-center text-xs">
+                                  <span className="font-bold text-stone-700 dark:text-stone-300">Seat {hist.seat}</span>
+                                  <span className="text-stone-400 font-mono">Removed: {formatDateShort(hist.leftAt)}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+               )}
+
+               {editMemberModal.editHistory && editMemberModal.editHistory.length > 0 && (
+                  <div className="mt-6 border-t border-stone-100 dark:border-stone-800 pt-4">
+                      <h4 className="text-xs font-bold text-stone-500 dark:text-stone-400 uppercase mb-3 flex items-center gap-2"><History size={14} /> Membership History</h4>
+                      <div className="space-y-2">{[...editMemberModal.editHistory].sort((a, b) => (b.end?.seconds || 0) - (a.end?.seconds || 0)).map((hist, i) => (<div key={i} className="bg-stone-50 dark:bg-stone-800/50 p-3 rounded-lg border border-stone-200 dark:border-stone-700 flex justify-between items-center"><div><div className="font-bold text-stone-700 dark:text-stone-300 text-sm">{hist.type}</div><div className="text-xs text-stone-500 dark:text-stone-400 mt-0.5 flex items-center gap-1"><Calendar size={10} />{formatDateShort(hist.start)} - {formatDateShort(hist.end)}</div></div><div className="text-[10px] font-mono text-stone-400 bg-white dark:bg-stone-900 px-2 py-1 rounded border border-stone-200 dark:border-stone-700">Archived: {formatDateShort(hist.archivedAt)}</div></div>))}</div>
+                  </div>
+               )}
+               {editMemberModal.paymentHistory && editMemberModal.paymentHistory.length > 0 && (
+                  <div className="mt-6 border-t border-stone-100 dark:border-stone-800 pt-4">
+                      <h4 className="text-xs font-bold text-stone-500 dark:text-stone-400 uppercase mb-3 flex items-center gap-2"><CreditCard size={14} /> Payment History</h4>
+                      <div className="space-y-2">{[...editMemberModal.paymentHistory].sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)).map((pay, i) => (<div key={i} className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg border border-indigo-100 dark:border-indigo-900/30 flex justify-between items-center"><div><div className="font-bold text-indigo-700 dark:text-indigo-300 text-sm">{pay.type || 'Payment'}</div><div className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5 font-mono">{formatDateShort(pay.date)}</div></div><div className="text-right"><div className="font-bold text-indigo-800 dark:text-indigo-200">₹{pay.amount}</div><div className="text-[10px] text-indigo-400 uppercase">{pay.method}</div></div></div>))}</div>
+                  </div>
+               )}
+             </div>
+             <div className="p-4 bg-stone-50 dark:bg-stone-800/50 flex justify-end">
+                {editMemberModal.mode === 'history' ? (
+                  <button onClick={() => setEditMemberModal(null)} className="px-6 py-2 rounded-lg font-bold text-stone-500 hover:bg-stone-200 dark:hover:bg-stone-700">Close</button>
+                ) : (
+                  <button onClick={saveMemberUpdate} className="bg-[#4a5d23] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#3b4a1c] flex items-center gap-2"><Save size={16} /> Save</button>
+                )}
              </div>
            </div>
         </div>
       )}
 
-      {welcomeScreen && (<div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"><div className="relative bg-white dark:bg-stone-900 rounded-3xl shadow-2xl p-8 w-[90%] max-w-sm text-center overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 border border-stone-200 dark:border-stone-700"><div className="relative z-10 mt-4"><div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white dark:ring-stone-800 ${welcomeScreen.type === 'check-in' ? 'bg-[#eef2e2] text-[#4a5d23]' : 'bg-amber-100 text-amber-600'}`}>{welcomeScreen.type === 'check-in' ? <Hand size={48} /> : <Smile size={48} />}</div><h2 className="text-2xl font-extrabold text-stone-800 dark:text-white mb-2 tracking-tight leading-tight">{welcomeScreen.type === 'check-in' ? 'Welcome to SYKiA! 🌿' : 'Have a Wonderful Day! ☀️'}</h2><p className="text-xl font-medium text-stone-600 dark:text-stone-300 mb-8">{welcomeScreen.name}</p></div></div></div>)}
-      {feedback && (<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[200] w-[90%] max-w-md text-center"><div className={`px-6 py-3 rounded-full shadow-xl font-bold text-sm flex items-center justify-center gap-2 animate-in slide-in-from-bottom-4 fade-in ${feedback.type === 'success' ? 'bg-stone-800 text-white' : 'bg-red-500 text-white'}`}>{feedback.message}</div></div>)}
+      {welcomeScreen && (<div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"><div className="relative bg-white dark:bg-stone-900 rounded-3xl shadow-2xl p-8 w-[90%] max-w-sm text-center overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 border border-stone-200 dark:border-stone-700"><div className="relative z-10 mt-4"><div className={`mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg ring-4 ring-white dark:ring-stone-800 ${welcomeScreen.type === 'check-in' ? 'bg-[#eef2e2] text-[#4a5d23]' : 'bg-amber-100 text-amber-600'}`}>{welcomeScreen.type === 'check-in' ? <Hand size={48} /> : <Smile size={48} />}</div><h2 className="text-2xl font-extrabold text-stone-800 dark:text-white mb-2 tracking-tight leading-tight">{welcomeScreen.type === 'check-in' ? 'Welcome to SYKiA! 🌿' : 'Have a Wonderful Day! ☀️'}</h2><p className="text-xl font-medium text-stone-600 dark:text-stone-300 mb-8">{welcomeScreen.name}</p></div></div></div>)}
+      {feedback && (<div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[300] w-[90%] max-w-md text-center"><div className={`px-6 py-3 rounded-full shadow-xl font-bold text-sm flex items-center justify-center gap-2 animate-in slide-in-from-bottom-4 fade-in ${feedback.type === 'success' ? 'bg-stone-800 text-white' : 'bg-red-500 text-white'}`}>{feedback.message}</div></div>)}
     </div>
   );
 }
