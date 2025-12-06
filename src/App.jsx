@@ -208,6 +208,7 @@ export default function App() {
   }, [feedback]);
 
   useEffect(() => { 
+    if (!auth) return; // FIX: Prevent crash if firebase not init
     const initAuth = async () => { 
         try { 
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
