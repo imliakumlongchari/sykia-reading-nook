@@ -32,12 +32,13 @@ import {
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+   apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
+  authDomain: "sykia-reading-nook.firebaseapp.com",
+  projectId: "sykia-reading-nook",
+  storageBucket: "sykia-reading-nook.firebasestorage.app",
+  messagingSenderId: "100174275222",
+  appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
+  measurementId: "G-XP1YTYF7VE"
 };
 
 const initFirebase = () => {
