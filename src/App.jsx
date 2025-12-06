@@ -32,13 +32,12 @@ import {
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
-  authDomain: "sykia-reading-nook.firebaseapp.com",
-  projectId: "sykia-reading-nook",
-  storageBucket: "sykia-reading-nook.firebasestorage.app",
-  messagingSenderId: "100174275222",
-  appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
-  measurementId: "G-XP1YTYF7VE"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const initFirebase = () => {
@@ -369,15 +368,15 @@ export default function App() {
     // =========================================================================
     // REPLACE VALUES BELOW WITH YOUR EMAILJS CREDENTIALS
     // =========================================================================
-    const EMAILJS_SERVICE_ID = "service_yigkhv1"; 
-    const EMAILJS_TEMPLATE_ID = "template_qgw6fb6";
-    const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
+    const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID"; 
+    const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+    const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
     // =========================================================================
 
-    // FIX: CHANGED STATE TO 'verify' TO MATCH UI
-    if (EMAILJS_SERVICE_ID === "service_yigkhv1") {
+    // Check if keys are placeholder (Simulation Mode)
+    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID" || EMAILJS_PUBLIC_KEY === "YOUR_PUBLIC_KEY") {
         // Fallback for simulation
-        alert(`[SIMULATION] Verification Code for ${targetEmail}: ${code}\n\nTo send real emails, edit App.jsx and update the EmailJS keys inside sendVerificationCode().`);
+        alert(`[SIMULATION MODE]\n(EmailJS keys not configured)\n\nVerification Code for ${targetEmail}: ${code}`);
         setOtpStep('verify');
         return;
     }
@@ -388,22 +387,27 @@ export default function App() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                service_id: service_yigkhv1,
-                template_id: template_qgw6fb6,
-                user_id: eCcic3_qPYVX4H6gG,
+                service_id: EMAILJS_SERVICE_ID,
+                template_id: EMAILJS_TEMPLATE_ID,
+                user_id: EMAILJS_PUBLIC_KEY,
                 template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
             })
         });
-        // FIX: CHANGED STATE TO 'verify'
+        
         if (response.ok) { 
             setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); 
             setOtpStep('verify'); 
         } 
-        else { throw new Error('Email service error'); }
+        else { 
+            const errorText = await response.text();
+            console.error("EmailJS Error:", errorText);
+            throw new Error('Email service error'); 
+        }
     } catch (error) {
         console.error(error);
-        alert(`[FALLBACK] Email failed to send. Code is: ${code}`);
-        // FIX: CHANGED STATE TO 'verify' SO USER CAN STILL ENTER CODE
+        // Graceful Fallback: If real email fails, show code in alert so user isn't stuck
+        setFeedback({ type: 'warning', message: 'Email failed. Using simulation.' });
+        alert(`[SIMULATION FALLBACK]\nEmail delivery failed (check console for details).\n\nYour code is: ${code}`);
         setOtpStep('verify');
     }
   };
