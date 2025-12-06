@@ -374,14 +374,6 @@ export default function App() {
     const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
     // =========================================================================
 
-    // Check if keys are placeholder (Simulation Mode)
-    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID" || EMAILJS_PUBLIC_KEY === "YOUR_PUBLIC_KEY") {
-        // Fallback for simulation
-        alert(`[SIMULATION MODE]\n(EmailJS keys not configured)\n\nVerification Code for ${targetEmail}: ${code}`);
-        setOtpStep('verify');
-        return;
-    }
-
     setFeedback({ type: 'success', message: 'Sending code...' });
     try {
         const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -402,13 +394,15 @@ export default function App() {
         else { 
             const errorText = await response.text();
             console.error("EmailJS Error:", errorText);
-            throw new Error('Email service error'); 
+            // Show the actual error from the API to help you debug
+            alert(`[EMAIL FAILED]\nServer response: ${errorText}\n\nPlease verify your Service ID, Template ID, and Public Key in App.jsx line 550.`);
+            // Allow proceeding with simulation only after showing the error
+            setOtpStep('verify');
         }
     } catch (error) {
         console.error(error);
-        // Graceful Fallback: If real email fails, show code in alert so user isn't stuck
-        setFeedback({ type: 'warning', message: 'Email failed. Using simulation.' });
-        alert(`[SIMULATION FALLBACK]\nEmail delivery failed (check console for details).\n\nYour code is: ${code}`);
+        setFeedback({ type: 'warning', message: 'Network error. Using simulation.' });
+        alert(`[NETWORK ERROR]\nCould not reach email server.\n\nSimulation Code: ${code}`);
         setOtpStep('verify');
     }
   };
