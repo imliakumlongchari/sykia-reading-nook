@@ -815,7 +815,13 @@ export default function App() {
                         <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-lg text-xs font-bold text-center mb-4">Identity Verified</div>
                         <div>
                             <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Update Admin Email</label>
-                            <input type="email" value={emailInput || appSettings.adminEmail} onChange={(e) => setEmailInput(e.target.value)} className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" />
+                            {/* FIX: Remove "|| appSettings.adminEmail" from value so it can be edited */}
+                            <input 
+                                type="email" 
+                                value={emailInput} 
+                                onChange={(e) => setEmailInput(e.target.value)} 
+                                className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" 
+                            />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-stone-500 uppercase mb-1">New PIN (4 Digits)</label>
