@@ -32,7 +32,7 @@ import {
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-   apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
+  apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
   authDomain: "sykia-reading-nook.firebaseapp.com",
   projectId: "sykia-reading-nook",
   storageBucket: "sykia-reading-nook.firebasestorage.app",
@@ -374,10 +374,11 @@ export default function App() {
     const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
     // =========================================================================
 
+    // FIX: CHANGED STATE TO 'verify' TO MATCH UI
     if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
         // Fallback for simulation
         alert(`[SIMULATION] Verification Code for ${targetEmail}: ${code}\n\nTo send real emails, edit App.jsx and update the EmailJS keys inside sendVerificationCode().`);
-        setOtpStep('verifying');
+        setOtpStep('verify');
         return;
     }
 
@@ -393,12 +394,17 @@ export default function App() {
                 template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
             })
         });
-        if (response.ok) { setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); setOtpStep('verifying'); } 
+        // FIX: CHANGED STATE TO 'verify'
+        if (response.ok) { 
+            setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); 
+            setOtpStep('verify'); 
+        } 
         else { throw new Error('Email service error'); }
     } catch (error) {
         console.error(error);
-        alert(`[FALLBACK] Email failed to send.\nYour code is: ${code}`);
-        setOtpStep('verifying');
+        alert(`[FALLBACK] Email failed to send. Code is: ${code}`);
+        // FIX: CHANGED STATE TO 'verify' SO USER CAN STILL ENTER CODE
+        setOtpStep('verify');
     }
   };
 
