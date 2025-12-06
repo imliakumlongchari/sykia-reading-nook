@@ -125,8 +125,16 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
       </div>
       <div className="text-right shrink-0 flex items-center gap-2">
         <div className="flex flex-col gap-1 items-end">
-          <div className="text-xs font-bold text-stone-700 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded flex items-center gap-1"><LogIn size={12} className="text-stone-400" />{formatTime(log.checkInTime)}</div>
-          {log.checkOutTime && <div className="text-xs font-bold text-stone-500 dark:text-stone-400 bg-stone-50 dark:bg-stone-900 px-2 py-1 rounded flex items-center gap-1"><LogOut size={12} className="text-stone-400" />{formatTime(log.checkOutTime)}</div>}
+          <div className="text-xs font-bold text-stone-700 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded flex items-center gap-1">
+             <LogIn size={12} className="text-stone-400" />
+             {formatTime(log.checkInTime)}
+             {(log.manualCheckIn || log.isEdited) && <Wrench size={10} className="text-blue-400 ml-1" />}
+          </div>
+          {log.checkOutTime && <div className="text-xs font-bold text-stone-500 dark:text-stone-400 bg-stone-50 dark:bg-stone-900 px-2 py-1 rounded flex items-center gap-1">
+              <LogOut size={12} className="text-stone-400" />
+              {formatTime(log.checkOutTime)}
+              {(log.manualCheckOut || log.isEdited) && <Wrench size={10} className="text-amber-400 ml-1" />}
+          </div>}
         </div>
         <button onClick={() => onEdit(log)} className="p-3 text-stone-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full transition-colors"><Edit2 size={18} /></button>
       </div>
@@ -347,7 +355,7 @@ export default function App() {
       <header className="bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-30 shadow-sm transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center w-full sm:w-auto">
-            <div><h1 className="text-xl font-bold text-[#4a5d23] dark:text-[#a3b86c] leading-none tracking-wide" style={{ fontFamily: "'Nunito', sans-serif" }}>SYKiA READING NOOK (v2)</h1><p className="text-xs text-stone-500 dark:text-stone-400 font-medium mt-1">Attendance Portal</p></div>
+            <div><h1 className="text-xl font-bold text-[#4a5d23] dark:text-[#a3b86c] leading-none tracking-wide" style={{ fontFamily: "'Nunito', sans-serif" }}>SYKiA READING NOOK</h1><p className="text-xs text-stone-500 dark:text-stone-400 font-medium mt-1">Attendance Portal</p></div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
              <button onClick={() => setShowSeatMapModal(true)} className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-full border border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"><Sofa size={16} className={activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-500 dark:text-stone-400"} /><span className={`text-sm font-bold ${activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-600 dark:text-stone-300"}`}>{activeSeatCount} / {TOTAL_SEATS}</span></button>
@@ -508,14 +516,14 @@ export default function App() {
                      const daysLeft = getDaysRemaining(person.membershipEnd);
                      const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && !isExpired;
                      
-                     // FIX: Strict Date Logic for Renew Button
+                     // FIX: Strict Date Logic for Renew Button (Only if Expired or Expires Today)
                      const isRenewable = (() => {
                          if (!person.membershipEnd || person.status === 'archived' || person.pendingRenewal) return false;
                          const today = new Date();
                          today.setHours(0,0,0,0);
                          const end = person.membershipEnd.toDate ? person.membershipEnd.toDate() : new Date(person.membershipEnd);
                          end.setHours(0,0,0,0);
-                         // Only renewable if TODAY >= End Date (i.e. Expired or Expires Today)
+                         // Renewable only if today >= End Date (Expired or Expires Today)
                          return today.getTime() >= end.getTime();
                      })();
 
@@ -566,12 +574,9 @@ export default function App() {
                      const seatNum = i + 1;
                      const seatOwners = getSeatOwners(seatNum);
                      // 1. CASE: Occupied but NOT Assigned (e.g., Walk-in/Staff override)
-                     // Fix: Find active log for this seat if no owner found
                      const activeLog = todaysLogs.find(l => !l.checkOutTime && l.seatNumber == seatNum);
-                     
                      if (!seatOwners) {
                         if (activeLog) {
-                            // Render "Occupied by Walk-in" Tile
                             const isStaff = activeLog.category === 'staff';
                             return (
                                <button key={seatNum} onClick={() => handlePersonClick({ name: activeLog.memberName, id: activeLog.id, type: activeLog.memberType }, activeLog.category)} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]`}>
@@ -581,13 +586,7 @@ export default function App() {
                                </button>
                             );
                         }
-                        // Render Empty Tile
-                        return (
-                           <div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60">
-                              <span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span>
-                              <span className="text-[10px] text-stone-400 uppercase font-bold tracking-wider">Empty</span>
-                           </div>
-                        );
+                        return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60"><span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span></div>);
                      }
                      
                      // 2. CASE: Full Day Owner
@@ -642,23 +641,6 @@ export default function App() {
       {/* ... Other Modals (Edit, Delete, Pin, Welcome) ... */}
       {showPinModal && (<div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in duration-200"><div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[90%] max-w-xs overflow-hidden animate-in zoom-in-95 duration-200"><div className="p-6 text-center"><h3 className="text-xl font-bold text-stone-800 dark:text-white mb-4">Admin Access</h3><input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} maxLength={4} className="w-full text-center text-3xl font-mono tracking-[0.5em] py-3 border-2 border-stone-200 dark:border-stone-700 bg-white text-stone-900 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-stone-800 mb-6" placeholder="••••" autoFocus/><div className="grid grid-cols-2 gap-3"><button onClick={() => { setShowPinModal(false); setPinInput(''); }} className="py-3 font-bold text-stone-500 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl">Cancel</button><button onClick={verifyPin} className="py-3 font-bold text-white bg-stone-800 hover:bg-stone-900 rounded-xl shadow-lg">Unlock</button></div></div></div></div>)}
 
-      {/* FIX: RESTORED DELETE MODAL */}
-      {deleteModal && (
-        <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="p-6 text-center">
-                 <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 size={32} /></div>
-                 <h3 className="text-xl font-bold text-stone-800 dark:text-white mb-2">Delete Member?</h3>
-                 <p className="text-stone-500 dark:text-stone-400 mb-6">Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.</p>
-                 <div className="grid grid-cols-2 gap-3">
-                    <button type="button" onClick={() => setDeleteModal(null)} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors">Cancel</button>
-                    <button type="button" onClick={executeDeletePerson} className="py-3 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg transition-colors">Delete</button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-      
       {/* FIX: RESTORED CONFIRM MODAL WITH Z-INDEX > 200 */}
       {confirmModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -677,6 +659,23 @@ export default function App() {
                  <div className="grid grid-cols-2 gap-3">
                     <button type="button" onClick={() => setConfirmModal(null)} disabled={isSubmitting} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl disabled:opacity-50">Cancel</button>
                     <button type="button" onClick={executeAttendanceAction} disabled={isSubmitting} className="py-3 font-bold text-white bg-[#4a5d23] hover:bg-[#3b4a1c] rounded-xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-70">{isSubmitting && <Loader2 size={16} className="animate-spin" />} Confirm</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* FIX: RESTORED DELETE MODAL */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                 <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 size={32} /></div>
+                 <h3 className="text-xl font-bold text-stone-800 dark:text-white mb-2">Delete Member?</h3>
+                 <p className="text-stone-500 dark:text-stone-400 mb-6">Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.</p>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setDeleteModal(null)} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors">Cancel</button>
+                    <button type="button" onClick={executeDeletePerson} className="py-3 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg transition-colors">Delete</button>
                  </div>
               </div>
            </div>
@@ -710,7 +709,7 @@ export default function App() {
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[95%] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
              <div className="p-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-800/50">
-               <h3 className="font-bold text-stone-800 dark:text-white">{editMemberModal.mode === 'restore' ? 'Restore Member' : 'Edit Member'}</h3>
+               <h3 className="font-bold text-stone-800 dark:text-white">{editMemberModal.mode === 'restore' ? 'Restore Member' : editMemberModal.mode === 'history' ? 'History' : editMemberModal.mode === 'renew' ? 'Renew Membership' : 'Edit Member'}</h3>
                <button onClick={() => setEditMemberModal(null)} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
              </div>
              <div className="p-6 space-y-4 overflow-y-auto">
