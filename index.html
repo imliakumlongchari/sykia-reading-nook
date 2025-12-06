@@ -4,22 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" />
     
-    <!-- Viewport settings for full screen mobile experience -->
+    <!-- FIX: Use viewport-fit=cover and user-scalable=no for native app feel -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
-    <!-- PWA Theme Colors -->
     <meta name="theme-color" content="#4a5d23" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- TAILWIND CONFIGURATION: This fixes the Dark Mode bug -->
+    <!-- FIX: Configuration to force Class-based Dark Mode (Prevents OS conflict) -->
     <script>
       tailwind.config = {
-        darkMode: 'class', // This tells Tailwind to wait for the .dark class, ignoring system settings
+        darkMode: 'class', 
         theme: {
           extend: {
             colors: {
@@ -43,18 +41,26 @@
     </script>
 
     <style>
-      /* Base Styles */
+      /* FIX: Use 100dvh (Dynamic Viewport Height) to fix mobile scroll/cutoff issues */
       html, body {
         overscroll-behavior-y: none;
-        background-color: #fafaf9; /* stone-50 (Light Mode Default) */
+        background-color: #fafaf9; /* Default Light Mode Background */
         min-height: 100dvh;
-        transition: background-color 0.3s ease, color 0.3s ease;
+        margin: 0;
+        padding: 0;
+        transition: background-color 0.3s ease;
       }
 
-      /* Dark Mode Styles - Triggered ONLY when the .dark class is added to html tag */
+      /* Dark Mode Overrides */
       html.dark, html.dark body {
-        background-color: #0c0a09; /* stone-950 */
+        background-color: #0c0a09; /* Dark Mode Background */
         color: #fafaf9;
+      }
+      
+      /* Hide scrollbar for clean mobile UI but allow scrolling */
+      ::-webkit-scrollbar {
+        width: 0px;
+        background: transparent;
       }
     </style>
 
