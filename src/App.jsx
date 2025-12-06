@@ -53,7 +53,7 @@ const initFirebase = () => {
        return { auth: getAuth(app), db: getFirestore(app), appId: "sykia-main", error: null };
     }
     else {
-      return { error: "Firebase config not found. Please paste your keys in the firebaseConfig object." };
+      return { error: "Firebase config not found." };
     }
   } catch (e) {
     return { error: "Failed to initialize Firebase." };
@@ -83,6 +83,7 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
   const origIn = log.originalCheckInTime ? formatTime(log.originalCheckInTime) : null;
   const origOut = log.originalCheckOutTime ? formatTime(log.originalCheckOutTime) : null;
   const showOriginalBox = (log.originalCheckInTime || log.originalCheckOutTime);
+  const status = member ? getMemberStatus(member, log.category) : 'Unknown';
   
   let displayDuration = '0m';
   let isLive = false;
@@ -98,9 +99,9 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
       } catch(e) {}
   }
 
-  const isExpired = member && getMemberStatus(member, log.category) === 'Expired';
   const daysLeft = member ? getDaysRemaining(member.membershipEnd) : null;
-  const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && !isExpired;
+  const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 2 && status === 'Active';
+  const isExpired = status === 'Expired';
 
   return (
     <div className="p-4 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors flex items-center justify-between border-b border-stone-100 dark:border-stone-800 last:border-0 group">
@@ -185,7 +186,6 @@ export default function App() {
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (darkMode) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); } }, [darkMode]);
   
-  // Init Firebase & Auth
   useEffect(() => { 
     const initAuth = async () => { 
         try { 
@@ -198,7 +198,6 @@ export default function App() {
     return () => unsubscribe(); 
   }, []);
   
-  // Data Fetching
   useEffect(() => {
     if (!user) return;
     try {
@@ -210,7 +209,6 @@ export default function App() {
     } catch (e) { setLoading(false); }
   }, [user]);
 
-  // Admin Auto-Lock
   useEffect(() => {
     if (!isAdmin) return;
     let timeoutId;
@@ -221,6 +219,7 @@ export default function App() {
     return () => { clearTimeout(timeoutId); events.forEach(e => window.removeEventListener(e, resetTimer)); };
   }, [isAdmin]);
 
+  // --- Derived State ---
   const todayStr = getTodayString();
   const todaysLogs = useMemo(() => logs.filter(log => log.dateString === todayStr), [logs, todayStr]);
   const getSeatOwners = (seatNum) => {
@@ -239,24 +238,41 @@ export default function App() {
   const activeSeatCount = useMemo(() => { let count = 0; for (let i = 1; i <= TOTAL_SEATS; i++) { if (getSeatOwners(i)) count++; } return count; }, [members, staff]); 
   const totalActiveReaders = useMemo(() => members.filter(m => m.status !== 'archived').length, [members]);
   
+  const seatOccupancy = useMemo(() => {
+    const occupancy = {}; for(let i=1; i<=TOTAL_SEATS; i++) occupancy[i] = { morning: null, afternoon: null };
+    [...members, ...staff].forEach(m => {
+      if (m.status !== 'archived' && m.assignedSeat) {
+        const seat = parseInt(m.assignedSeat);
+        if (occupancy[seat]) {
+            const type = m.type || 'Staff'; 
+            const isStaffMember = staff.some(s => s.id === m.id);
+            const status = getMemberStatus(m, isStaffMember ? 'staff' : 'student');
+            if (status === 'Active' || status === 'Upcoming' || status === 'Staff') {
+                if (['Full Day', 'Single Day', 'Weekly', 'Staff'].includes(type) || isStaffMember) { occupancy[seat].morning = type; occupancy[seat].afternoon = type; } 
+                else if (type === 'Morning Shift') occupancy[seat].morning = type;
+                else if (type === 'Afternoon Shift') occupancy[seat].afternoon = type;
+            }
+        }
+      }
+    });
+    return occupancy;
+  }, [members, staff]);
+
   const getSeatStatus = (seatNum, requestType, excludeMemberId = null) => {
-    const occupied = getSeatOwners(seatNum);
-    if (!occupied) return { available: true, reason: '' };
-    if (occupied.type === 'full') {
-        if (excludeMemberId && occupied.member.id === excludeMemberId) return { available: true, reason: '' };
-        return { available: false, reason: 'Full Day/Staff Taken' };
-    }
-    if (occupied.type === 'split') {
-        const reqMorning = ['Full Day', 'Single Day', 'Weekly', 'Morning Shift', 'Staff'].includes(requestType);
-        const reqAfternoon = ['Full Day', 'Single Day', 'Weekly', 'Afternoon Shift', 'Staff'].includes(requestType);
-        if (reqMorning && occupied.morning) {
-            if (!excludeMemberId || occupied.morning.id !== excludeMemberId) return { available: false, reason: 'Morning Taken' };
-        }
-        if (reqAfternoon && occupied.afternoon) {
-            if (!excludeMemberId || occupied.afternoon.id !== excludeMemberId) return { available: false, reason: 'Afternoon Taken' };
-        }
-    }
-    return { available: true, reason: '' };
+      const seat = seatOccupancy[seatNum];
+      if (!seat) return { available: true, reason: '' };
+      const conflicts = members.filter(m => m.id !== excludeMemberId && m.status !== 'archived' && m.assignedSeat == seatNum && (getMemberStatus(m, 'student') === 'Active' || getMemberStatus(m, 'student') === 'Upcoming'));
+      let isMorningBlocked = false, isAfternoonBlocked = false;
+      conflicts.forEach(m => {
+          if (['Full Day', 'Single Day', 'Weekly'].includes(m.type)) { isMorningBlocked = true; isAfternoonBlocked = true; }
+          else if (m.type === 'Morning Shift') isMorningBlocked = true;
+          else if (m.type === 'Afternoon Shift') isAfternoonBlocked = true;
+      });
+      let requiredMorning = ['Full Day', 'Single Day', 'Weekly', 'Morning Shift', 'Staff'].includes(requestType);
+      let requiredAfternoon = ['Full Day', 'Single Day', 'Weekly', 'Afternoon Shift', 'Staff'].includes(requestType);
+      if (requiredMorning && isMorningBlocked) return { available: false, reason: 'Morning Taken' };
+      if (requiredAfternoon && isAfternoonBlocked) return { available: false, reason: 'Afternoon Taken' };
+      return { available: true, reason: '' };
   };
 
   const getStatusMap = (targetLogs) => {
@@ -294,6 +310,7 @@ export default function App() {
   const autoCheckOutMember = async (memberName) => { const activeLog = logs.find(l => l.memberName === memberName && l.dateString === todayStr && !l.checkOutTime); if (activeLog) { try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', activeLog.id), { checkOutTime: serverTimestamp(), status: 'completed', autoCheckedOut: true }); } catch (e) {} } };
   const handlePersonClick = (person, category) => { if (person.isBlocked) { setFeedback({ type: 'error', message: 'Blocked.' }); setTimeout(() => setFeedback(null), 3000); return; } const map = category === 'staff' ? staffStatusMap : readerStatusMap; const statusObj = map[person.name]; openConfirmationModal(person, category, statusObj?.status === 'checked-in', statusObj?.logId, person.assignedSeat); };
   const openConfirmationModal = (person, category, isCheckedIn, logId, seatNumber = null) => { const now = new Date(); setManualTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`); setUseManualTime(false); setConfirmModal({ person, category, action: isCheckedIn ? 'Check Out' : 'Check In', logId, seatNumber }); };
+  
   const executeAttendanceAction = async () => { if (!confirmModal || isSubmitting) return; setIsSubmitting(true); const { person, category, action, logId, seatNumber } = confirmModal; let timestampToUse = useManualTime && manualTime ? Timestamp.fromDate(combineDateAndTime(new Date(), manualTime)) : serverTimestamp(); let originalTimestamp = useManualTime ? serverTimestamp() : null; let isManual = useManualTime; try { if (action === 'Check Out') { const updates = { checkOutTime: timestampToUse, status: 'completed', manualCheckOut: isManual }; if (isManual) updates.originalCheckOutTime = originalTimestamp; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', logId), updates); if (category !== 'staff' && person.type === 'Single Day') { try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', person.id); const archiveUpdates = { status: 'archived', archivedAt: serverTimestamp() }; if (person.assignedSeat) { archiveUpdates.assignedSeat = null; const newHistoryEntry = { seat: person.assignedSeat, leftAt: Timestamp.now() }; archiveUpdates.seatHistory = [newHistoryEntry, ...(person.seatHistory || [])]; } await updateDoc(memberRef, archiveUpdates); } catch (e) { console.error("Auto-archive failed", e); } } setWelcomeScreen({ type: 'check-out', name: person.name }); } else { const newDoc = { memberName: person.name, memberType: person.type || 'Staff', category, dateString: todayStr, checkInTime: timestampToUse, checkOutTime: null, status: 'active', manualCheckIn: isManual, seatNumber: seatNumber ? parseInt(seatNumber) : null }; if (isManual) newDoc.originalCheckInTime = originalTimestamp; await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance_logs'), newDoc); try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', category === 'staff' ? 'staff' : 'members', person.id); const lastCheckIn = person.lastCheckInDate ? person.lastCheckInDate.toDate() : null; const today = new Date(); today.setHours(0,0,0,0); let newStreak = person.currentStreak || 0; if (lastCheckIn) { lastCheckIn.setHours(0,0,0,0); const diffDays = Math.ceil(Math.abs(today - lastCheckIn) / (1000 * 60 * 60 * 24)); const isSundaySkip = (diffDays === 2 && today.getDay() === 1 && lastCheckIn.getDay() === 6); if (diffDays === 1 || isSundaySkip) newStreak += 1; else if (diffDays > 1) newStreak = 1; } else newStreak = 1; await updateDoc(memberRef, { lastCheckInDate: serverTimestamp(), currentStreak: newStreak }); } catch (e) {} setWelcomeScreen({ type: 'check-in', name: person.name }); } } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } finally { setIsSubmitting(false); setConfirmModal(null); setTimeout(() => setWelcomeScreen(null), 1900); } };
   const saveLogEdit = async () => { if (!editLogModal) return; try { const originalDate = (editLogModal.checkInTime && editLogModal.checkInTime.toDate) ? editLogModal.checkInTime.toDate() : new Date(); const updates = { isEdited: true }; if (!editLogModal.originalCheckInTime && editLogModal.checkInTime) updates.originalCheckInTime = editLogModal.checkInTime; if (!editLogModal.originalCheckOutTime && editLogModal.checkOutTime) updates.originalCheckOutTime = editLogModal.checkOutTime; if (editLogModal.editCheckIn !== undefined && editLogModal.editCheckIn !== '') { updates.checkInTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckIn)); } if (editLogModal.editCheckOut) { updates.checkOutTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckOut)); updates.status = 'completed'; } else if (editLogModal.editCheckOut === '') { updates.checkOutTime = null; updates.status = 'active'; } await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', editLogModal.id), updates); setFeedback({ type: 'success', message: 'Record updated.' }); setEditLogModal(null); } catch (e) { setFeedback({ type: 'error', message: 'Failed to update.' }); } setTimeout(() => setFeedback(null), 3000); };
   const openEditMember = (person, category) => { setEditMemberModal({ ...person, category: category || 'student', editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '' }); };
@@ -492,7 +509,6 @@ export default function App() {
                            <div className="flex items-center gap-2">
                               {(rosterTab === 'readers') && <button onClick={() => openRenewMember(person)} className="p-3 text-[#4a5d23] hover:bg-[#eef2e2]"><RotateCcw size={18}/></button>}
                               {(rosterTab !== 'archived' && rosterTab !== 'ex_staff') ? <button onClick={() => openEditMember(person)} className="p-3 text-stone-300 hover:text-blue-500"><Edit2 size={18}/></button> : <button onClick={() => openRestoreMember(person)} className="p-3 text-stone-300 hover:text-green-500"><UserCheck size={18}/></button>}
-                              {/* FIX: Added missing onClick handler for delete button */}
                               <button onClick={() => setDeleteModal({ id: person.id, name: person.name, category: (rosterTab === 'staff' || rosterTab === 'ex_staff') ? 'staff' : 'student' })} className="p-3 text-stone-300 hover:text-red-500"><Trash2 size={18}/></button>
                            </div>
                         </div>
@@ -530,10 +546,73 @@ export default function App() {
                   {[...Array(TOTAL_SEATS)].map((_, i) => {
                      const seatNum = i + 1;
                      const seatOwners = getSeatOwners(seatNum);
-                     if (!seatOwners) return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60"><span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span></div>);
-                     const isCheckedIn = todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum);
-                     const isStaff = seatOwners.type === 'full' && seatOwners.member.type === 'Staff';
-                     return (<div key={seatNum} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all ${isCheckedIn ? 'bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]' : 'bg-stone-100'}`}><span className="text-lg font-bold">{seatNum}</span></div>);
+                     // 1. CASE: Occupied but NOT Assigned (e.g., Walk-in/Staff override)
+                     // Fix: Find active log for this seat if no owner found
+                     const activeLog = todaysLogs.find(l => !l.checkOutTime && l.seatNumber == seatNum);
+                     
+                     if (!seatOwners) {
+                        if (activeLog) {
+                            // Render "Occupied by Walk-in" Tile
+                            const isStaff = activeLog.category === 'staff';
+                            return (
+                               <button key={seatNum} onClick={() => handlePersonClick({ name: activeLog.memberName, id: activeLog.id, type: activeLog.memberType }, activeLog.category)} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]`}>
+                                  <span className="text-lg font-bold text-white drop-shadow-md">{seatNum}</span>
+                                  <span className="text-[10px] font-bold text-white drop-shadow-md leading-tight line-clamp-1">{activeLog.memberName}</span>
+                                  {isStaff ? <span className="text-[9px] font-bold text-purple-700 uppercase tracking-wide mt-0.5">Staff</span> : <span className="text-[9px] text-white mt-0.5">Present</span>}
+                               </button>
+                            );
+                        }
+                        // Render Empty Tile
+                        return (
+                           <div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60">
+                              <span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span>
+                              <span className="text-[10px] text-stone-400 uppercase font-bold tracking-wider">Empty</span>
+                           </div>
+                        );
+                     }
+                     
+                     // 2. CASE: Full Day Owner
+                     if (seatOwners.type === 'full') {
+                        const m = seatOwners.member;
+                        const isStaff = m.type === 'Staff';
+                        const isCheckedIn = todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum);
+                        const statusLabel = getMemberStatus(m, isStaff ? 'staff' : 'student');
+                        const isUpcoming = statusLabel === 'Upcoming';
+                        return (
+                           <button key={seatNum} onClick={() => handlePersonClick(m, isStaff ? 'staff' : 'student')} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all ${isCheckedIn ? 'bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]' : isStaff ? 'bg-purple-200 border-purple-300 dark:bg-purple-900/40 dark:border-purple-800' : isUpcoming ? 'bg-blue-200 border-blue-300 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-200' : 'bg-amber-200 border-amber-300 dark:bg-amber-900/40 dark:border-amber-800 dark:text-amber-200'}`}>
+                              <span className={`text-lg font-bold mb-1 ${isCheckedIn ? 'text-white drop-shadow-md' : isStaff ? 'text-purple-700' : 'text-stone-700'}`}>{seatNum}</span>
+                              <span className={`text-[10px] font-bold leading-tight line-clamp-1 ${isCheckedIn ? 'text-white drop-shadow-md' : 'text-stone-800 dark:text-stone-200'}`}>{m.name}</span>
+                              {isStaff ? (
+                                 <span className="text-[9px] font-bold text-purple-700 uppercase tracking-wide mt-0.5">Staff</span>
+                              ) : (
+                                 <span className={`text-[9px] mt-0.5 ${isCheckedIn ? 'text-white' : 'text-stone-600 dark:text-stone-400'}`}>{isUpcoming ? `Starts ${formatDateShort(m.membershipStart)}` : (m.type === 'Single Day' && m.duration ? m.duration : m.type)}</span>
+                              )}
+                           </button>
+                        );
+                     }
+                     
+                     // 3. CASE: Split Shift Owner
+                     if (seatOwners.type === 'split') {
+                        const { morning, afternoon } = seatOwners;
+                        const now = new Date();
+                        const isMorning = now.getHours() < 14;
+                        const isMorningCheckedIn = morning && todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum && l.memberName === morning.name);
+                        const isAfternoonCheckedIn = afternoon && todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum && l.memberName === afternoon.name);
+                        return (
+                           <div key={seatNum} className="aspect-square rounded-xl flex flex-col border-2 border-stone-300 dark:border-stone-700 overflow-hidden relative bg-white dark:bg-stone-900">
+                              <button onClick={() => morning && handlePersonClick(morning, 'student')} disabled={!morning} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isMorningCheckedIn ? 'bg-[#c9db93]' : (isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
+                                 {morning ? (<><div className="flex items-center justify-center gap-1 w-full"><span className="text-[8px] font-bold text-stone-500 uppercase tracking-tighter shrink-0">AM</span><span className={`text-[11px] font-bold truncate ${isMorningCheckedIn ? 'text-white drop-shadow-sm' : 'text-stone-700 dark:text-stone-200'}`}>{morning.name}</span></div>{getMemberStatus(morning, 'student') === 'Upcoming' && <span className="text-[8px] text-blue-500 font-medium leading-none mt-0.5">{formatDateShort(morning.membershipStart)}</span>}</>) : <span className="text-[9px] font-medium text-stone-400 uppercase tracking-wide">Empty</span>}
+                              </button>
+                              <div className="h-px bg-stone-300 dark:bg-stone-700 w-full relative z-10">
+                                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-200 dark:bg-yellow-900/40 px-1.5 py-px rounded-full border border-yellow-300 dark:border-yellow-700 text-[9px] text-yellow-800 dark:text-yellow-200 font-extrabold shadow-sm select-none">{seatNum}</div>
+                              </div>
+                              <button onClick={() => afternoon && handlePersonClick(afternoon, 'student')} disabled={!afternoon} className={`flex-1 w-full flex flex-col justify-center items-center px-1 py-0.5 ${isAfternoonCheckedIn ? 'bg-[#c9db93]' : (!isMorning ? 'bg-white dark:bg-stone-800 hover:bg-stone-50' : 'bg-stone-100 dark:bg-stone-900 opacity-100')}`}>
+                                 {afternoon ? (<><div className="flex items-center justify-center gap-1 w-full"><span className="text-[8px] font-bold text-stone-500 uppercase tracking-tighter shrink-0">PM</span><span className={`text-[11px] font-bold truncate ${isAfternoonCheckedIn ? 'text-white drop-shadow-sm' : 'text-stone-700 dark:text-stone-200'}`}>{afternoon.name}</span></div>{getMemberStatus(afternoon, 'student') === 'Upcoming' && <span className="text-[8px] text-blue-500 font-medium leading-none mt-0.5">{formatDateShort(afternoon.membershipStart)}</span>}</>) : <span className="text-[9px] font-medium text-stone-400 uppercase tracking-wide">Empty</span>}
+                              </button>
+                           </div>
+                        );
+                     }
+                     return null;
                   })}
                </div>
             </div>
