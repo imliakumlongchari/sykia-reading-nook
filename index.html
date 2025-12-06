@@ -4,25 +4,57 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" />
     
-    <!-- FIX: Use dvh for true full height on mobile -->
+    <!-- Viewport settings for full screen mobile experience -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
+    <!-- PWA Theme Colors -->
     <meta name="theme-color" content="#4a5d23" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
 
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- TAILWIND CONFIGURATION: This fixes the Dark Mode bug -->
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // This tells Tailwind to wait for the .dark class, ignoring system settings
+        theme: {
+          extend: {
+            colors: {
+              stone: {
+                50: '#fafaf9',
+                100: '#f5f5f4',
+                200: '#e7e5e4',
+                300: '#d6d3d1',
+                400: '#a8a29e',
+                500: '#78716c',
+                600: '#57534e',
+                700: '#44403c',
+                800: '#292524',
+                900: '#1c1917',
+                950: '#0c0a09',
+              }
+            }
+          }
+        }
+      }
+    </script>
+
     <style>
+      /* Base Styles */
       html, body {
         overscroll-behavior-y: none;
-        background-color: #fafaf9;
-        min-height: 100dvh; /* Dynamic Viewport Height */
+        background-color: #fafaf9; /* stone-50 (Light Mode Default) */
+        min-height: 100dvh;
+        transition: background-color 0.3s ease, color 0.3s ease;
       }
-      @media (prefers-color-scheme: dark) {
-        html, body {
-          background-color: #0c0a09;
-        }
+
+      /* Dark Mode Styles - Triggered ONLY when the .dark class is added to html tag */
+      html.dark, html.dark body {
+        background-color: #0c0a09; /* stone-950 */
+        color: #fafaf9;
       }
     </style>
 
