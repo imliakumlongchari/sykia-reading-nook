@@ -32,13 +32,12 @@ import {
 
 // --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
-  apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
-  authDomain: "sykia-reading-nook.firebaseapp.com",
-  projectId: "sykia-reading-nook",
-  storageBucket: "sykia-reading-nook.firebasestorage.app",
-  messagingSenderId: "100174275222",
-  appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
-  measurementId: "G-XP1YTYF7VE"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const initFirebase = () => {
@@ -135,7 +134,7 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
 };
 
 // --------------------------------------------
-// MAIN APP EXPORT IS HERE (DO NOT REMOVE)
+// MAIN APP EXPORT IS HERE
 // --------------------------------------------
 export default function App() {
   const [user, setUser] = useState(null);
@@ -281,7 +280,6 @@ export default function App() {
   const staffLogsToday = useMemo(() => todaysLogs.filter(l => l.category === 'staff'), [todaysLogs]);
   const readerStatusMap = useMemo(() => getStatusMap(readerLogsToday), [readerLogsToday]);
   const staffStatusMap = useMemo(() => getStatusMap(staffLogsToday), [staffLogsToday]);
-  
   const filteredList = useMemo(() => {
     let list = [];
     if (activeTab === 'roster') {
@@ -299,7 +297,6 @@ export default function App() {
     } else list = members;
     return list.filter(m => (m.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
   }, [members, staff, searchQuery, activeTab, rosterTab, readerSubTab, halfDaySubFilter]);
-  
   const historyLogs = useMemo(() => { if (historyView === 'monthly' || historyView === 'yearly') return []; const grouped = {}; logs.forEach(log => { if (historySearchQuery && !log.memberName?.toLowerCase().includes(historySearchQuery.toLowerCase())) return; if (historyFilter !== 'All' && ((historyFilter === 'Staff' && log.category !== 'staff') || (historyFilter !== 'Staff' && log.memberType !== historyFilter))) return; if (!log.dateString) return; if (!grouped[log.dateString]) grouped[log.dateString] = []; grouped[log.dateString].push(log); }); return grouped; }, [logs, historySearchQuery, historyFilter, historyView]);
   const monthlyUniqueStats = useMemo(() => { const stats = {}; logs.forEach(log => { if (!log.checkInTime) return; if (log.dateString) { const monthKey = log.dateString.substring(0, 7); if (!stats[monthKey]) stats[monthKey] = new Set(); stats[monthKey].add(log.memberName); } }); return Object.entries(stats).map(([key, set]) => { const [year, month] = key.split('-'); const dateObj = new Date(parseInt(year), parseInt(month) - 1); return { key, label: dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }), count: set.size }; }).sort((a, b) => b.key.localeCompare(a.key)); }, [logs]);
   const busyHours = useMemo(() => { const hours = new Array(24).fill(0); logs.forEach(log => { if (log.checkInTime) { try { const date = log.checkInTime.toDate ? log.checkInTime.toDate() : new Date(log.checkInTime); const hour = date.getHours(); if (!isNaN(hour)) hours[hour]++; } catch(e) {} } }); const max = Math.max(...hours, 1); return hours.map(count => ({ count, height: (count / max) * 100 })); }, [logs]);
@@ -328,11 +325,12 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans selection:bg-[#dce6c5] pb-20 relative transition-colors duration-300 ${darkMode ? 'dark bg-stone-950 text-stone-100' : 'bg-stone-50 text-stone-800'}`} style={{ fontFamily: "'Nunito', sans-serif" }}>
+      {/* STYLES & HEADER - Ensure max-w-7xl or max-w-[1600px] is used here */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');`}</style>
       <header className="bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-30 shadow-sm transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="max-w-[1600px] mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center w-full sm:w-auto">
-            <div><h1 className="text-xl font-bold text-[#4a5d23] dark:text-[#a3b86c] leading-none tracking-wide" style={{ fontFamily: "'Nunito', sans-serif" }}>SYKiA READING NOOK</h1><p className="text-xs text-stone-500 dark:text-stone-400 font-medium mt-1">Attendance Portal</p></div>
+            <div><h1 className="text-xl font-bold text-[#4a5d23] dark:text-[#a3b86c] leading-none tracking-wide" style={{ fontFamily: "'Nunito', sans-serif" }}>SYKiA READING NOOK (v2)</h1><p className="text-xs text-stone-500 dark:text-stone-400 font-medium mt-1">Attendance Portal</p></div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
              <button onClick={() => setShowSeatMapModal(true)} className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-full border border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"><Sofa size={16} className={activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-500 dark:text-stone-400"} /><span className={`text-sm font-bold ${activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-600 dark:text-stone-300"}`}>{activeSeatCount} / {TOTAL_SEATS}</span></button>
@@ -343,7 +341,9 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 relative z-0 overflow-x-hidden">
+      {/* MAIN CONTENT - Using wide layout */}
+      <main className="max-w-[1600px] mx-auto px-4 py-6 relative z-0 overflow-x-hidden">
+        {/* Navigation Tabs */}
         <div className="flex gap-2 mb-6 p-1 bg-stone-100 dark:bg-stone-800 rounded-xl overflow-x-auto">
           <button type="button" onClick={() => handleTabChange('reader_kiosk')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'reader_kiosk' ? 'bg-white dark:bg-stone-700 text-[#4a5d23] dark:text-[#a3b86c] shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}><BookOpen size={18} /> Readers</button>
           <button type="button" onClick={() => handleTabChange('staff_kiosk')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'staff_kiosk' ? 'bg-white dark:bg-stone-700 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}>{!isAdmin && <Lock size={14} className="opacity-50" />}<Briefcase size={18} /> Staff</button>
@@ -351,6 +351,7 @@ export default function App() {
           <button type="button" onClick={() => handleTabChange('history')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-white dark:bg-stone-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}>{!isAdmin && <Lock size={14} className="opacity-50" />}<History size={18} /> History</button>
         </div>
 
+        {/* KIOSK VIEW */}
         {(activeTab === 'reader_kiosk' || activeTab === 'staff_kiosk') && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             {activeTab === 'reader_kiosk' && (
@@ -447,6 +448,7 @@ export default function App() {
 
         {activeTab === 'roster' && (
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* Roster Tab Content ... (Kept concise, logic identical to previous) */}
               <div className="flex justify-center mb-6 overflow-x-auto">
                 <div className="bg-stone-200 dark:bg-stone-800 p-1 rounded-lg flex gap-1 whitespace-nowrap">
                   {['readers', 'staff', 'archived', 'ex_staff'].map(t => (
@@ -473,7 +475,6 @@ export default function App() {
               <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-800 overflow-hidden">
                  <div className="divide-y divide-stone-100 dark:divide-stone-800 max-h-[500px] overflow-y-auto">
                  {filteredList.map(person => {
-                     // ... Roster List Items logic is same as above ...
                      const map = (rosterTab === 'staff' || rosterTab === 'ex_staff') ? staffStatusMap : readerStatusMap;
                      const statusObj = map[person.name];
                      const isCheckedIn = statusObj?.status === 'checked-in';
@@ -511,12 +512,10 @@ export default function App() {
         )}
       </main>
 
-      {/* ... Modals (Seat Map, Edit, etc) ... */}
-      {/* Ensure modals use larger text classes like text-sm and p-4 padding */}
+      {/* --- MODALS --- */}
       {showSeatMapModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-stone-900/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[95%] max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* ... Seat Map Content (Standard Grid) ... */}
             <div className="p-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-800/50">
                <h3 className="font-bold text-stone-800 dark:text-white flex items-center gap-2"><Sofa size={20} className="text-[#4a5d23]"/> Live Seat Map</h3>
                <button onClick={() => setShowSeatMapModal(false)} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
@@ -526,8 +525,6 @@ export default function App() {
                   {[...Array(TOTAL_SEATS)].map((_, i) => {
                      const seatNum = i + 1;
                      const seatOwners = getSeatOwners(seatNum);
-                     const activeLog = todaysLogs.find(l => !l.checkOutTime && l.seatNumber == seatNum);
-                     if (!seatOwners && activeLog) return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]"><span className="text-lg font-bold text-white drop-shadow-md">{seatNum}</span></div>);
                      if (!seatOwners) return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60"><span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span></div>);
                      const isCheckedIn = todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum);
                      return (<div key={seatNum} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all ${isCheckedIn ? 'bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]' : 'bg-stone-100'}`}><span className="text-lg font-bold">{seatNum}</span></div>);
@@ -538,7 +535,6 @@ export default function App() {
         </div>
       )}
       
-      {/* ... Other Modals (Edit, Delete, Pin, Welcome) ... */}
       {showPinModal && (<div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in duration-200"><div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[90%] max-w-xs overflow-hidden animate-in zoom-in-95 duration-200"><div className="p-6 text-center"><h3 className="text-xl font-bold text-stone-800 dark:text-white mb-4">Admin Access</h3><input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} maxLength={4} className="w-full text-center text-3xl font-mono tracking-[0.5em] py-3 border-2 border-stone-200 dark:border-stone-700 bg-white text-stone-900 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-stone-800 mb-6" placeholder="••••" autoFocus/><div className="grid grid-cols-2 gap-3"><button onClick={() => { setShowPinModal(false); setPinInput(''); }} className="py-3 font-bold text-stone-500 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl">Cancel</button><button onClick={verifyPin} className="py-3 font-bold text-white bg-stone-800 hover:bg-stone-900 rounded-xl shadow-lg">Unlock</button></div></div></div></div>)}
 
       {editMemberModal && (
@@ -549,7 +545,6 @@ export default function App() {
                <button onClick={() => setEditMemberModal(null)} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
              </div>
              <div className="p-6 space-y-4 overflow-y-auto">
-                 {/* ... Form inputs using w-full, text-base, p-3 padding ... */}
                  <div><label className="block text-sm font-bold text-stone-500 uppercase mb-1">Name</label><input type="text" value={editMemberModal.editName} onChange={(e) => setEditMemberModal({...editMemberModal, editName: e.target.value})} className="w-full border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-3 text-base"/></div>
                  <div className="flex justify-end pt-4"><button onClick={saveMemberUpdate} className="bg-[#4a5d23] text-white px-6 py-3 rounded-xl font-bold text-base hover:bg-[#3b4a1c] w-full sm:w-auto">Save Changes</button></div>
              </div>
