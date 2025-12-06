@@ -79,8 +79,6 @@ const getDaysRemaining = (e) => { if (!e) return null; try { const today = new D
 const getMemberStatus = (m, cat) => { if (cat === 'staff') return 'Staff'; if (m.isBlocked) return 'Blocked'; if (m.status === 'archived') return 'Left Centre'; if (!m.membershipStart || !m.membershipEnd) return 'No Dates'; const today = new Date(); today.setHours(0,0,0,0); const start = m.membershipStart.toDate ? m.membershipStart.toDate() : new Date(m.membershipStart); start.setHours(0,0,0,0); const end = m.membershipEnd.toDate ? m.membershipEnd.toDate() : new Date(m.membershipEnd); end.setHours(0,0,0,0); if (today < start) return 'Upcoming'; if (today > end) return 'Expired'; return 'Active'; };
 const isBirthday = (dob) => { if (!dob) return false; try { const today = new Date(); const d = dob.toDate ? dob.toDate() : new Date(dob); return today.getMonth() === d.getMonth() && today.getDate() === d.getDate(); } catch(e) { return false; } };
 
-// --- COMPONENTS ---
-
 const AttendanceItem = ({ log, member, onEdit, now }) => {
   const origIn = log.originalCheckInTime ? formatTime(log.originalCheckInTime) : null;
   const origOut = log.originalCheckOutTime ? formatTime(log.originalCheckOutTime) : null;
@@ -242,21 +240,15 @@ export default function App() {
   const totalActiveReaders = useMemo(() => members.filter(m => m.status !== 'archived').length, [members]);
   
   const getSeatStatus = (seatNum, requestType, excludeMemberId = null) => {
-    // Simplified seat occupancy check for robustness
     const occupied = getSeatOwners(seatNum);
     if (!occupied) return { available: true, reason: '' };
-    
-    // If occupied by Full Day or Staff, it's totally blocked
     if (occupied.type === 'full') {
         if (excludeMemberId && occupied.member.id === excludeMemberId) return { available: true, reason: '' };
         return { available: false, reason: 'Full Day/Staff Taken' };
     }
-    
-    // If split, check slots
     if (occupied.type === 'split') {
         const reqMorning = ['Full Day', 'Single Day', 'Weekly', 'Morning Shift', 'Staff'].includes(requestType);
         const reqAfternoon = ['Full Day', 'Single Day', 'Weekly', 'Afternoon Shift', 'Staff'].includes(requestType);
-        
         if (reqMorning && occupied.morning) {
             if (!excludeMemberId || occupied.morning.id !== excludeMemberId) return { available: false, reason: 'Morning Taken' };
         }
@@ -297,28 +289,8 @@ export default function App() {
   const sortedDates = useMemo(() => Object.keys(historyLogs).sort((a, b) => new Date(b) - new Date(a)), [historyLogs]);
 
   // Actions
-  const handleTabChange = (tab) => { 
-    if (tab === 'reader_kiosk') { setActiveTab(tab); return; } 
-    // Logic for locking mechanism
-    if (isAdmin) { setActiveTab(tab); } 
-    else { setTargetTab(tab); setShowPinModal(true); setPinInput(''); } 
-  };
-  
-  const verifyPin = () => { 
-    // FIX: Use loose equality '==' to handle number/string mismatch from DB
-    if (pinInput == (appSettings.adminPin || DEFAULT_PIN)) { 
-        setIsAdmin(true); 
-        setShowPinModal(false); 
-        if (targetTab) setActiveTab(targetTab); 
-        setPinInput(''); 
-    } else { 
-        setFeedback({ type: 'error', message: 'Incorrect PIN' }); 
-        setPinInput(''); 
-        setTimeout(() => setFeedback(null), 1500); 
-    } 
-  };
-  
-  // ... (Rest of the helper actions remain the same)
+  const handleTabChange = (tab) => { if (tab === 'reader_kiosk') { setActiveTab(tab); return; } if (isAdmin) { setActiveTab(tab); } else { setTargetTab(tab); setShowPinModal(true); setPinInput(''); } };
+  const verifyPin = () => { if (pinInput == (appSettings.adminPin || DEFAULT_PIN)) { setIsAdmin(true); setShowPinModal(false); if (targetTab) setActiveTab(targetTab); setPinInput(''); } else { setFeedback({ type: 'error', message: 'Incorrect PIN' }); setPinInput(''); setTimeout(() => setFeedback(null), 1500); } };
   const autoCheckOutMember = async (memberName) => { const activeLog = logs.find(l => l.memberName === memberName && l.dateString === todayStr && !l.checkOutTime); if (activeLog) { try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', activeLog.id), { checkOutTime: serverTimestamp(), status: 'completed', autoCheckedOut: true }); } catch (e) {} } };
   const handlePersonClick = (person, category) => { if (person.isBlocked) { setFeedback({ type: 'error', message: 'Blocked.' }); setTimeout(() => setFeedback(null), 3000); return; } const map = category === 'staff' ? staffStatusMap : readerStatusMap; const statusObj = map[person.name]; openConfirmationModal(person, category, statusObj?.status === 'checked-in', statusObj?.logId, person.assignedSeat); };
   const openConfirmationModal = (person, category, isCheckedIn, logId, seatNumber = null) => { const now = new Date(); setManualTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`); setUseManualTime(false); setConfirmModal({ person, category, action: isCheckedIn ? 'Check Out' : 'Check In', logId, seatNumber }); };
@@ -520,6 +492,7 @@ export default function App() {
                            <div className="flex items-center gap-2">
                               {(rosterTab === 'readers') && <button onClick={() => openRenewMember(person)} className="p-3 text-[#4a5d23] hover:bg-[#eef2e2]"><RotateCcw size={18}/></button>}
                               {(rosterTab !== 'archived' && rosterTab !== 'ex_staff') ? <button onClick={() => openEditMember(person)} className="p-3 text-stone-300 hover:text-blue-500"><Edit2 size={18}/></button> : <button onClick={() => openRestoreMember(person)} className="p-3 text-stone-300 hover:text-green-500"><UserCheck size={18}/></button>}
+                              {/* FIX: Added missing onClick handler for delete button */}
                               <button onClick={() => setDeleteModal({ id: person.id, name: person.name, category: (rosterTab === 'staff' || rosterTab === 'ex_staff') ? 'staff' : 'student' })} className="p-3 text-stone-300 hover:text-red-500"><Trash2 size={18}/></button>
                            </div>
                         </div>
@@ -571,6 +544,23 @@ export default function App() {
       {/* ... Other Modals (Edit, Delete, Pin, Welcome) ... */}
       {showPinModal && (<div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in duration-200"><div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[90%] max-w-xs overflow-hidden animate-in zoom-in-95 duration-200"><div className="p-6 text-center"><h3 className="text-xl font-bold text-stone-800 dark:text-white mb-4">Admin Access</h3><input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} maxLength={4} className="w-full text-center text-3xl font-mono tracking-[0.5em] py-3 border-2 border-stone-200 dark:border-stone-700 bg-white text-stone-900 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-stone-800 mb-6" placeholder="••••" autoFocus/><div className="grid grid-cols-2 gap-3"><button onClick={() => { setShowPinModal(false); setPinInput(''); }} className="py-3 font-bold text-stone-500 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl">Cancel</button><button onClick={verifyPin} className="py-3 font-bold text-white bg-stone-800 hover:bg-stone-900 rounded-xl shadow-lg">Unlock</button></div></div></div></div>)}
 
+      {/* FIX: RESTORED DELETE MODAL */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                 <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 size={32} /></div>
+                 <h3 className="text-xl font-bold text-stone-800 dark:text-white mb-2">Delete Member?</h3>
+                 <p className="text-stone-500 dark:text-stone-400 mb-6">Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.</p>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setDeleteModal(null)} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors">Cancel</button>
+                    <button type="button" onClick={executeDeletePerson} className="py-3 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg transition-colors">Delete</button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       {editMemberModal && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[95%] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -579,7 +569,6 @@ export default function App() {
                <button onClick={() => setEditMemberModal(null)} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
              </div>
              <div className="p-6 space-y-4 overflow-y-auto">
-                 {/* ... Form inputs using w-full, text-base, p-3 padding ... */}
                  <div><label className="block text-sm font-bold text-stone-500 uppercase mb-1">Name</label><input type="text" value={editMemberModal.editName} onChange={(e) => setEditMemberModal({...editMemberModal, editName: e.target.value})} className="w-full border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-lg p-3 text-base"/></div>
                  <div className="flex justify-end pt-4"><button onClick={saveMemberUpdate} className="bg-[#4a5d23] text-white px-6 py-3 rounded-xl font-bold text-base hover:bg-[#3b4a1c] w-full sm:w-auto">Save Changes</button></div>
              </div>
