@@ -39,7 +39,6 @@ const firebaseConfig = {
   messagingSenderId: "100174275222",
   appId: "1:100174275222:web:c6cf5e58bfa5d4ac9cd8b7",
   measurementId: "G-XP1YTYF7VE"
-};
 
 const initFirebase = () => {
   try {
@@ -374,15 +373,22 @@ export default function App() {
     const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
     // =========================================================================
 
+    // 1. CHECK FOR PLACEHOLDERS (Restore this)
+    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
+        alert(`[SIMULATION MODE]\n(Email keys not configured)\n\nYour Verification Code is: ${code}`);
+        setOtpStep('verify');
+        return;
+    }
+
     setFeedback({ type: 'success', message: 'Sending code...' });
     try {
         const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                service_id: service_yigkhv1,
-                template_id: template_qgw6fb6,
-                user_id: eCcic3_qPYVX4H6gG,
+                service_id: EMAILJS_SERVICE_ID,
+                template_id: EMAILJS_TEMPLATE_ID,
+                user_id: EMAILJS_PUBLIC_KEY,
                 template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
             })
         });
@@ -394,15 +400,13 @@ export default function App() {
         else { 
             const errorText = await response.text();
             console.error("EmailJS Error:", errorText);
-            // Show the actual error from the API to help you debug
-            alert(`[EMAIL FAILED]\nServer response: ${errorText}\n\nPlease verify your Service ID, Template ID, and Public Key in App.jsx line 550.`);
-            // Allow proceeding with simulation only after showing the error
+            // 2. IMPROVE FALLBACK MESSAGE
+            alert(`[FALLBACK MODE]\nCould not connect to Email server.\n\nYour Verification Code is: ${code}`);
             setOtpStep('verify');
         }
     } catch (error) {
         console.error(error);
-        setFeedback({ type: 'warning', message: 'Network error. Using simulation.' });
-        alert(`[NETWORK ERROR]\nCould not reach email server.\n\nSimulation Code: ${code}`);
+        alert(`[FALLBACK MODE]\nCould not connect to Email server.\n\nYour Verification Code is: ${code}`);
         setOtpStep('verify');
     }
   };
