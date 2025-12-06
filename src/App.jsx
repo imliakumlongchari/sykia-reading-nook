@@ -20,70 +20,17 @@ import {
   deleteField
 } from 'firebase/firestore';
 import { 
-  Clock, 
-  LogIn, 
-  LogOut, 
-  Users, 
-  History, 
-  CheckCircle2, 
-  Building2,
-  CalendarDays,
-  ChevronRight,
-  ChevronDown,
-  Sun,
-  Sunset,
-  Sunrise,
-  Plus,
-  Trash2,
-  Search,
-  AlertCircle,
-  AlertTriangle,
-  Edit2,
-  Save,
-  X,
-  Briefcase,
-  BookOpen,
-  Wrench,
-  Info,
-  Calendar,
-  Hourglass,
-  Archive,
-  RotateCcw,
-  CalendarCheck,
-  CalendarRange,
-  Lock,
-  Unlock,
-  KeyRound,
-  Filter,
-  Settings,
-  Mail,
-  ShieldCheck,
-  TreeDeciduous,
-  Timer,
-  BarChart3,
-  FileText,
-  Smile,
-  Hand,
-  UserMinus,
-  UserCheck,
-  BellRing,
-  Award,
-  Download,
-  Moon,
-  Zap,
-  Ban,
-  Cake,
-  Sofa,
-  CreditCard,
-  StickyNote,
-  Loader2,
-  MapPin,
-  TrendingUp,
-  PartyPopper
+  Clock, LogIn, LogOut, Users, History, CheckCircle2, Building2, CalendarDays,
+  ChevronRight, ChevronDown, Sun, Sunset, Sunrise, Plus, Trash2, Search,
+  AlertCircle, AlertTriangle, Edit2, Save, X, Briefcase, BookOpen, Wrench,
+  Info, Calendar, Hourglass, Archive, RotateCcw, CalendarCheck, CalendarRange,
+  Lock, Unlock, KeyRound, Filter, Settings, Mail, ShieldCheck, TreeDeciduous,
+  Timer, BarChart3, FileText, Smile, Hand, UserMinus, UserCheck, BellRing,
+  Award, Download, Moon, Zap, Ban, Cake, Sofa, CreditCard, StickyNote,
+  Loader2, MapPin, TrendingUp, PartyPopper
 } from 'lucide-react';
 
-// --- Firebase Configuration (Safe Init) ---
-// --- 1. PASTE YOUR FIREBASE KEYS HERE (For StackBlitz/Deployment) ---
+// --- 1. PASTE YOUR FIREBASE KEYS HERE ---
 const firebaseConfig = {
   apiKey: "AIzaSyBSXLrR--P6IMCvyzir1QQPhJNfD5a6kcs",
   authDomain: "sykia-reading-nook.firebaseapp.com",
@@ -99,19 +46,14 @@ const initFirebase = () => {
     if (typeof __firebase_config !== 'undefined' && __firebase_config) {
       const config = JSON.parse(__firebase_config);
       const app = initializeApp(config);
-      return { 
-        auth: getAuth(app), 
-        db: getFirestore(app),
-        appId: typeof __app_id !== 'undefined' ? __app_id : 'default-app-id',
-        error: null 
-      };
+      return { auth: getAuth(app), db: getFirestore(app), appId: typeof __app_id !== 'undefined' ? __app_id : 'default-app-id', error: null };
     } 
     else if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
        const app = initializeApp(firebaseConfig);
        return { auth: getAuth(app), db: getFirestore(app), appId: "sykia-main", error: null };
     }
     else {
-      return { error: "Firebase config not found. Please paste your keys in the firebaseConfig object." };
+      return { error: "Firebase config not found." };
     }
   } catch (e) {
     return { error: "Failed to initialize Firebase." };
@@ -119,128 +61,23 @@ const initFirebase = () => {
 };
 
 const { auth, db, appId, error: firebaseError } = initFirebase();
-
-// --- CONSTANTS ---
 const DEFAULT_PIN = "1234";
 const TOTAL_SEATS = 42;
 
 // --- Helper Functions ---
-const formatDate = (date) => {
-  try {
-    return new Intl.DateTimeFormat('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(date);
-  } catch (e) { return 'Invalid Date'; }
-};
-
-const formatDateShort = (timestamp) => {
-  if (!timestamp) return '';
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
-  } catch (e) { return ''; }
-};
-
-const formatDateForInput = (timestamp) => {
-  if (!timestamp) return '';
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  } catch (e) { return ''; }
-};
-
-const formatDateStringHeader = (dateString) => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }).format(date);
-  } catch (e) { return dateString; }
-};
-
-const formatTime = (timestamp) => {
-  if (!timestamp) return '';
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch (e) { return ''; }
-};
-
-const getTimeStringFromTimestamp = (timestamp) => {
-  if (!timestamp) return '';
-  try {
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  } catch (e) { return ''; }
-};
-
-const combineDateAndTime = (baseDate, timeStr) => {
-  if (!timeStr) return new Date();
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const newDate = new Date(baseDate);
-  newDate.setHours(hours); newDate.setMinutes(minutes); newDate.setSeconds(0);
-  return newDate;
-};
-
-const getDuration = (start, end) => {
-  if (!start || !end) return 0;
-  try {
-      const startTime = start.toDate ? start.toDate() : new Date(start);
-      const endTime = end.toDate ? end.toDate() : new Date(end);
-      return Math.max(0, endTime - startTime);
-  } catch(e) { return 0; }
-};
-
-const formatDurationString = (ms) => {
-  if (ms <= 0) return '0m';
-  const minutes = Math.floor((ms / (1000 * 60)) % 60);
-  const hours = Math.floor((ms / (1000 * 60 * 60)));
-  if (hours === 0) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
-};
-
-const getTodayString = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
-const getDaysRemaining = (endDate) => {
-  if (!endDate) return null;
-  try {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const end = endDate.toDate ? endDate.toDate() : new Date(endDate); end.setHours(0, 0, 0, 0);
-    const diffTime = end - today;
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  } catch(e) { return null; }
-};
-
-const getMemberStatus = (member, category) => {
-  if (category === 'staff') return 'Staff';
-  if (member.isBlocked) return 'Blocked';
-  if (member.status === 'archived') return 'Left Centre';
-  if (!member.membershipStart || !member.membershipEnd) return 'No Dates';
-  const today = new Date(); today.setHours(0,0,0,0);
-  const start = member.membershipStart.toDate ? member.membershipStart.toDate() : new Date(member.membershipStart); start.setHours(0,0,0,0);
-  const end = member.membershipEnd.toDate ? member.membershipEnd.toDate() : new Date(member.membershipEnd); end.setHours(0,0,0,0);
-  if (today < start) return 'Upcoming';
-  if (today > end) return 'Expired';
-  return 'Active';
-};
-
-const isBirthday = (dobTimestamp) => {
-    if (!dobTimestamp) return false;
-    try {
-        const today = new Date();
-        const dob = dobTimestamp.toDate ? dobTimestamp.toDate() : new Date(dobTimestamp);
-        return today.getMonth() === dob.getMonth() && today.getDate() === dob.getDate();
-    } catch(e) { return false; }
-};
-
-// --- Components ---
+const formatDate = (d) => { try { return new Intl.DateTimeFormat('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(d); } catch (e) { return 'Invalid Date'; } };
+const formatDateShort = (t) => { if (!t) return ''; try { const d = t.toDate ? t.toDate() : new Date(t); if (isNaN(d.getTime())) return ''; return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(d); } catch (e) { return ''; } };
+const formatDateForInput = (t) => { if (!t) return ''; try { const d = t.toDate ? t.toDate() : new Date(t); if (isNaN(d.getTime())) return ''; return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; } catch (e) { return ''; } };
+const formatDateStringHeader = (s) => { try { const d = new Date(s); if (isNaN(d.getTime())) return s; return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' }).format(d); } catch (e) { return s; } };
+const formatTime = (t) => { if (!t) return ''; try { const d = t.toDate ? t.toDate() : new Date(t); if (isNaN(d.getTime())) return ''; return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+const getTimeStringFromTimestamp = (t) => { if (!t) return ''; try { const d = t.toDate ? t.toDate() : new Date(t); if (isNaN(d.getTime())) return ''; return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); } catch (e) { return ''; } };
+const combineDateAndTime = (base, timeStr) => { if (!timeStr) return new Date(); const [h, m] = timeStr.split(':').map(Number); const d = new Date(base); d.setHours(h); d.setMinutes(m); d.setSeconds(0); return d; };
+const getDuration = (s, e) => { if (!s || !e) return 0; try { const start = s.toDate ? s.toDate() : new Date(s); const end = e.toDate ? e.toDate() : new Date(e); return Math.max(0, end - start); } catch(e) { return 0; } };
+const formatDurationString = (ms) => { if (ms <= 0) return '0m'; const m = Math.floor((ms / (1000 * 60)) % 60); const h = Math.floor((ms / (1000 * 60 * 60))); return h === 0 ? `${m}m` : `${h}h ${m}m`; };
+const getTodayString = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const getDaysRemaining = (e) => { if (!e) return null; try { const today = new Date(); today.setHours(0, 0, 0, 0); const end = e.toDate ? e.toDate() : new Date(e); end.setHours(0, 0, 0, 0); return Math.ceil((end - today) / (1000 * 60 * 60 * 24)); } catch(err) { return null; } };
+const getMemberStatus = (m, cat) => { if (cat === 'staff') return 'Staff'; if (m.isBlocked) return 'Blocked'; if (m.status === 'archived') return 'Left Centre'; if (!m.membershipStart || !m.membershipEnd) return 'No Dates'; const today = new Date(); today.setHours(0,0,0,0); const start = m.membershipStart.toDate ? m.membershipStart.toDate() : new Date(m.membershipStart); start.setHours(0,0,0,0); const end = m.membershipEnd.toDate ? m.membershipEnd.toDate() : new Date(m.membershipEnd); end.setHours(0,0,0,0); if (today < start) return 'Upcoming'; if (today > end) return 'Expired'; return 'Active'; };
+const isBirthday = (dob) => { if (!dob) return false; try { const today = new Date(); const d = dob.toDate ? dob.toDate() : new Date(dob); return today.getMonth() === d.getMonth() && today.getDate() === d.getDate(); } catch(e) { return false; } };
 
 const AttendanceItem = ({ log, member, onEdit, now }) => {
   const origIn = log.originalCheckInTime ? formatTime(log.originalCheckInTime) : null;
@@ -297,6 +134,9 @@ const AttendanceItem = ({ log, member, onEdit, now }) => {
   );
 };
 
+// --------------------------------------------
+// MAIN APP EXPORT IS HERE (DO NOT REMOVE)
+// --------------------------------------------
 export default function App() {
   const [user, setUser] = useState(null);
   const [members, setMembers] = useState([]);
@@ -344,7 +184,18 @@ export default function App() {
 
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (darkMode) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); } }, [darkMode]);
-  useEffect(() => { const initAuth = async () => { try { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } else { await signInAnonymously(auth); } } catch (error) { console.error("Auth error:", error); } }; initAuth(); const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u)); return () => unsubscribe(); }, []);
+  
+  useEffect(() => { 
+    const initAuth = async () => { 
+        try { 
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } 
+            else { await signInAnonymously(auth); } 
+        } catch (error) { console.error("Auth error:", error); } 
+    }; 
+    initAuth(); 
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u)); 
+    return () => unsubscribe(); 
+  }, []);
   
   useEffect(() => {
     if (!user) return;
@@ -367,46 +218,7 @@ export default function App() {
     return () => { clearTimeout(timeoutId); events.forEach(e => window.removeEventListener(e, resetTimer)); };
   }, [isAdmin]);
 
-  useEffect(() => {
-    if (!members.length) return;
-    const runMemberMaintenance = async () => {
-      const now = new Date();
-      const promotionCandidates = members.filter(m => m.pendingRenewal && m.membershipEnd);
-      for (const m of promotionCandidates) {
-        try {
-          const endDate = m.membershipEnd.toDate();
-          if (now > endDate) {
-            const historyEntry = { start: m.membershipStart, end: m.membershipEnd, type: m.type, archivedAt: Timestamp.now() };
-            const memberRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id);
-            await updateDoc(memberRef, {
-              membershipStart: m.pendingRenewal.start, membershipEnd: m.pendingRenewal.end, type: m.pendingRenewal.type,
-              membershipHistory: [historyEntry, ...(m.membershipHistory || [])], pendingRenewal: deleteField(), status: 'active'
-            });
-          }
-        } catch (e) {}
-      }
-
-      const oneDayAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-      const seatRemovalCandidates = members.filter(m => {
-        if (!m.assignedSeat || !m.membershipEnd || m.status === 'archived' || m.pendingRenewal) return false;
-        const endDate = m.membershipEnd.toDate ? m.membershipEnd.toDate() : new Date(m.membershipEnd);
-        return endDate < oneDayAgo;
-      });
-
-      for (const m of seatRemovalCandidates) {
-        try { 
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id);
-            const updates = { assignedSeat: null };
-            if (m.assignedSeat) {
-               updates.seatHistory = [{ seat: m.assignedSeat, leftAt: Timestamp.now() }, ...(m.seatHistory || [])];
-            }
-            await updateDoc(docRef, updates); 
-        } catch (e) {}
-      }
-    };
-    runMemberMaintenance();
-  }, [members]);
-
+  // --- Derived State ---
   const todayStr = getTodayString();
   const todaysLogs = useMemo(() => logs.filter(log => log.dateString === todayStr), [logs, todayStr]);
   const getSeatOwners = (seatNum) => {
@@ -424,7 +236,7 @@ export default function App() {
 
   const activeSeatCount = useMemo(() => { let count = 0; for (let i = 1; i <= TOTAL_SEATS; i++) { if (getSeatOwners(i)) count++; } return count; }, [members, staff]); 
   const totalActiveReaders = useMemo(() => members.filter(m => m.status !== 'archived').length, [members]);
-
+  
   const seatOccupancy = useMemo(() => {
     const occupancy = {}; for(let i=1; i<=TOTAL_SEATS; i++) occupancy[i] = { morning: null, afternoon: null };
     [...members, ...staff].forEach(m => {
@@ -469,6 +281,7 @@ export default function App() {
   const staffLogsToday = useMemo(() => todaysLogs.filter(l => l.category === 'staff'), [todaysLogs]);
   const readerStatusMap = useMemo(() => getStatusMap(readerLogsToday), [readerLogsToday]);
   const staffStatusMap = useMemo(() => getStatusMap(staffLogsToday), [staffLogsToday]);
+  
   const filteredList = useMemo(() => {
     let list = [];
     if (activeTab === 'roster') {
@@ -486,6 +299,7 @@ export default function App() {
     } else list = members;
     return list.filter(m => (m.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
   }, [members, staff, searchQuery, activeTab, rosterTab, readerSubTab, halfDaySubFilter]);
+  
   const historyLogs = useMemo(() => { if (historyView === 'monthly' || historyView === 'yearly') return []; const grouped = {}; logs.forEach(log => { if (historySearchQuery && !log.memberName?.toLowerCase().includes(historySearchQuery.toLowerCase())) return; if (historyFilter !== 'All' && ((historyFilter === 'Staff' && log.category !== 'staff') || (historyFilter !== 'Staff' && log.memberType !== historyFilter))) return; if (!log.dateString) return; if (!grouped[log.dateString]) grouped[log.dateString] = []; grouped[log.dateString].push(log); }); return grouped; }, [logs, historySearchQuery, historyFilter, historyView]);
   const monthlyUniqueStats = useMemo(() => { const stats = {}; logs.forEach(log => { if (!log.checkInTime) return; if (log.dateString) { const monthKey = log.dateString.substring(0, 7); if (!stats[monthKey]) stats[monthKey] = new Set(); stats[monthKey].add(log.memberName); } }); return Object.entries(stats).map(([key, set]) => { const [year, month] = key.split('-'); const dateObj = new Date(parseInt(year), parseInt(month) - 1); return { key, label: dateObj.toLocaleString('default', { month: 'long', year: 'numeric' }), count: set.size }; }).sort((a, b) => b.key.localeCompare(a.key)); }, [logs]);
   const busyHours = useMemo(() => { const hours = new Array(24).fill(0); logs.forEach(log => { if (log.checkInTime) { try { const date = log.checkInTime.toDate ? log.checkInTime.toDate() : new Date(log.checkInTime); const hour = date.getHours(); if (!isNaN(hour)) hours[hour]++; } catch(e) {} } }); const max = Math.max(...hours, 1); return hours.map(count => ({ count, height: (count / max) * 100 })); }, [logs]);
@@ -501,7 +315,6 @@ export default function App() {
   const executeAttendanceAction = async () => { if (!confirmModal || isSubmitting) return; setIsSubmitting(true); const { person, category, action, logId, seatNumber } = confirmModal; let timestampToUse = useManualTime && manualTime ? Timestamp.fromDate(combineDateAndTime(new Date(), manualTime)) : serverTimestamp(); let originalTimestamp = useManualTime ? serverTimestamp() : null; let isManual = useManualTime; try { if (action === 'Check Out') { const updates = { checkOutTime: timestampToUse, status: 'completed', manualCheckOut: isManual }; if (isManual) updates.originalCheckOutTime = originalTimestamp; await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', logId), updates); if (category !== 'staff' && person.type === 'Single Day') { try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', person.id); const archiveUpdates = { status: 'archived', archivedAt: serverTimestamp() }; if (person.assignedSeat) { archiveUpdates.assignedSeat = null; const newHistoryEntry = { seat: person.assignedSeat, leftAt: Timestamp.now() }; archiveUpdates.seatHistory = [newHistoryEntry, ...(person.seatHistory || [])]; } await updateDoc(memberRef, archiveUpdates); } catch (e) { console.error("Auto-archive failed", e); } } setWelcomeScreen({ type: 'check-out', name: person.name }); } else { const newDoc = { memberName: person.name, memberType: person.type || 'Staff', category, dateString: todayStr, checkInTime: timestampToUse, checkOutTime: null, status: 'active', manualCheckIn: isManual, seatNumber: seatNumber ? parseInt(seatNumber) : null }; if (isManual) newDoc.originalCheckInTime = originalTimestamp; await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance_logs'), newDoc); try { const memberRef = doc(db, 'artifacts', appId, 'public', 'data', category === 'staff' ? 'staff' : 'members', person.id); const lastCheckIn = person.lastCheckInDate ? person.lastCheckInDate.toDate() : null; const today = new Date(); today.setHours(0,0,0,0); let newStreak = person.currentStreak || 0; if (lastCheckIn) { lastCheckIn.setHours(0,0,0,0); const diffDays = Math.ceil(Math.abs(today - lastCheckIn) / (1000 * 60 * 60 * 24)); const isSundaySkip = (diffDays === 2 && today.getDay() === 1 && lastCheckIn.getDay() === 6); if (diffDays === 1 || isSundaySkip) newStreak += 1; else if (diffDays > 1) newStreak = 1; } else newStreak = 1; await updateDoc(memberRef, { lastCheckInDate: serverTimestamp(), currentStreak: newStreak }); } catch (e) {} setWelcomeScreen({ type: 'check-in', name: person.name }); } } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } finally { setIsSubmitting(false); setConfirmModal(null); setTimeout(() => setWelcomeScreen(null), 1900); } };
   const saveLogEdit = async () => { if (!editLogModal) return; try { const originalDate = (editLogModal.checkInTime && editLogModal.checkInTime.toDate) ? editLogModal.checkInTime.toDate() : new Date(); const updates = { isEdited: true }; if (!editLogModal.originalCheckInTime && editLogModal.checkInTime) updates.originalCheckInTime = editLogModal.checkInTime; if (!editLogModal.originalCheckOutTime && editLogModal.checkOutTime) updates.originalCheckOutTime = editLogModal.checkOutTime; if (editLogModal.editCheckIn !== undefined && editLogModal.editCheckIn !== '') { updates.checkInTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckIn)); } if (editLogModal.editCheckOut) { updates.checkOutTime = Timestamp.fromDate(combineDateAndTime(originalDate, editLogModal.editCheckOut)); updates.status = 'completed'; } else if (editLogModal.editCheckOut === '') { updates.checkOutTime = null; updates.status = 'active'; } await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', editLogModal.id), updates); setFeedback({ type: 'success', message: 'Record updated.' }); setEditLogModal(null); } catch (e) { setFeedback({ type: 'error', message: 'Failed to update.' }); } setTimeout(() => setFeedback(null), 3000); };
   
-  // Member Edit Functions...
   const openEditMember = (person, category) => { setEditMemberModal({ ...person, category: category || 'student', editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '' }); };
   const openMemberHistory = (person) => { setEditMemberModal({ ...person, category: 'student', editName: person.name, editType: person.type, editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], mode: 'history' }); };
   const openRestoreMember = (person) => { const category = (person.type === 'Staff' || rosterTab === 'ex_staff') ? 'staff' : 'student'; setEditMemberModal({ ...person, category, editName: person.name, editType: person.type, editDuration: person.duration || 'Full Day', editAssignedSeat: person.assignedSeat || '', editStartDate: formatDateForInput(person.membershipStart), editEndDate: formatDateForInput(person.membershipEnd), editDob: formatDateForInput(person.birthDate), editNotes: person.notes || '', editIsBlocked: person.isBlocked || false, editHistory: person.membershipHistory || [], seatHistory: person.seatHistory || [], paymentHistory: person.payments || [], paymentAmount: '', paymentMethod: 'Cash', paymentNote: '', mode: 'restore' }); };
@@ -510,7 +323,7 @@ export default function App() {
   const executeDeletePerson = async () => { if (!deleteModal) return; await autoCheckOutMember(deleteModal.name); try { const collectionName = deleteModal.category === 'staff' ? 'staff' : 'members'; await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, deleteModal.id)); setFeedback({ type: 'success', message: 'Deleted successfully.' }); } catch(e) { setFeedback({ type: 'error', message: 'Failed to delete.' }); } setDeleteModal(null); setTimeout(() => setFeedback(null), 3000); };
   const updateMemberStatus = async (member, newStatus) => { if (newStatus === 'archived') await autoCheckOutMember(member.name); try { const collectionName = (member.type === 'Staff' || rosterTab === 'staff') ? 'staff' : 'members'; const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, member.id); const updates = { status: newStatus }; if (newStatus === 'archived') { updates.pendingRenewal = deleteField(); if (collectionName === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); updates.membershipEnd = Timestamp.fromDate(today); } if (member.assignedSeat) { updates.seatHistory = [{ seat: member.assignedSeat, leftAt: Timestamp.now() }, ...(member.seatHistory || [])]; updates.assignedSeat = null; } } else if (newStatus === 'active') { if (collectionName === 'staff') updates.membershipEnd = null; } await updateDoc(docRef, updates); setFeedback({ type: 'success', message: `Moved to ${newStatus === 'archived' ? 'Archive' : 'Active'} list.` }); } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } setTimeout(() => setFeedback(null), 3000); };
   const addToRoster = async () => { if (!newName.trim()) return; try { const collectionName = rosterTab === 'staff' ? 'staff' : 'members'; let initialStart = null; if (rosterTab === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); initialStart = Timestamp.fromDate(today); } const newDoc = { name: newName.trim(), type: rosterTab === 'staff' ? 'Staff' : newType, createdAt: serverTimestamp(), membershipStart: initialStart, membershipEnd: null, membershipHistory: [], seatHistory: [], status: 'active', currentStreak: 0, notes: newNotes, birthDate: newDob ? Timestamp.fromDate(new Date(newDob)) : null, isBlocked: false, assignedSeat: newSeat ? parseInt(newSeat) : null }; if (rosterTab === 'readers' && newType === 'Single Day') { const today = new Date(); today.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(today); newDoc.membershipEnd = Timestamp.fromDate(today); newDoc.duration = singleDayDuration; } else { if (newStartDate) { const d = new Date(newStartDate); d.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(d); } if (newEndDate) { const d = new Date(newEndDate); d.setHours(12, 0, 0, 0); newDoc.membershipEnd = Timestamp.fromDate(d); } } const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), newDoc); if (newPaymentAmount) await updateDoc(docRef, { payments: [{ amount: newPaymentAmount, method: newPaymentMethod, date: Timestamp.now(), type: 'Registration' }] }); setFeedback({ type: 'success', message: `Added to list.` }); setNewName(''); setNewStartDate(''); setNewEndDate(''); setNewSeat(''); setNewDob(''); setNewNotes(''); setNewPaymentAmount(''); setNewPaymentMethod('Cash'); } catch (e) { setFeedback({ type: 'error', message: 'Could not add person.' }); } setTimeout(() => setFeedback(null), 2000); };
-  
+
   const isAddDisabled = !newName.trim() || (rosterTab === 'readers' && newType !== 'Single Day' && (!newStartDate || !newEndDate));
 
   return (
@@ -632,8 +445,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ... (Other Tabs Roster, History remain similar but with larger text classes applied via standard Tailwind utilities) ... */}
-        {/* Just replacing the repeated block content with ... to save space in this response, but full code contains all logic */}
         {activeTab === 'roster' && (
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="flex justify-center mb-6 overflow-x-auto">
@@ -663,7 +474,6 @@ export default function App() {
                  <div className="divide-y divide-stone-100 dark:divide-stone-800 max-h-[500px] overflow-y-auto">
                  {filteredList.map(person => {
                      // ... Roster List Items logic is same as above ...
-                     // Using a simplified version for brevity in response, full logic preserved in real file
                      const map = (rosterTab === 'staff' || rosterTab === 'ex_staff') ? staffStatusMap : readerStatusMap;
                      const statusObj = map[person.name];
                      const isCheckedIn = statusObj?.status === 'checked-in';
@@ -694,6 +504,7 @@ export default function App() {
                  <h3 className="font-bold text-stone-800 dark:text-white flex items-center gap-2 mb-6"><BarChart3 size={18} className="text-[#4a5d23]"/> Peak Hours</h3>
                  <div className="flex items-end justify-between h-32 gap-1">{busyHours.map((h, i) => (<div key={i} className="flex-1 flex flex-col items-center gap-1 group"><div className="w-full bg-[#eef2e2] dark:bg-[#4a5d23]/20 rounded-t-sm relative transition-all group-hover:bg-[#dce6c5] dark:group-hover:bg-[#4a5d23]/40" style={{ height: `${h.height}%` }}><div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-stone-800 text-white text-[10px] px-2 py-1 rounded shadow-lg whitespace-nowrap z-10 transition-opacity">{h.count} Visits</div></div><span className="text-[9px] text-stone-400 font-mono rotate-0 sm:rotate-0">{i % 3 === 0 ? `${i}h` : ''}</span></div>))}</div>
               </div>
+              <div className="bg-white dark:bg-stone-900 p-6 rounded-2xl border border-stone-200 dark:border-stone-800 mb-6"><h3 className="font-bold text-stone-800 dark:text-white flex items-center gap-2 mb-4"><Users size={18} className="text-[#4a5d23]" /> Monthly Unique Visitors</h3><div className="space-y-3">{monthlyUniqueStats.map(stat => (<div key={stat.key} className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-800/50 rounded-lg"><span className="font-medium text-stone-600 dark:text-stone-300">{stat.label}</span><span className="font-bold text-[#4a5d23] dark:text-[#a3b86c] bg-[#eef2e2] dark:bg-[#4a5d23]/20 px-3 py-1 rounded-full text-xs">{stat.count} People</span></div>))}</div></div>
               <div className="relative mb-6"><div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-400"><Search size={24} /></div><input type="text" placeholder="Search history..." value={historySearchQuery} onChange={(e) => setHistorySearchQuery(e.target.value)} className="w-full pl-12 pr-4 py-4 border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-[#4a5d23] transition-all text-base" /></div>
               {sortedDates.map(dateStr => (<div key={dateStr} className="bg-white dark:bg-stone-900 rounded-xl shadow-sm border border-stone-200 dark:border-stone-800 overflow-hidden mb-4"><button onClick={() => setExpandedDates(prev => ({ ...prev, [dateStr]: !prev[dateStr] }))} className="w-full flex items-center justify-between p-4 bg-stone-50 dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors text-left"><span className="font-bold text-stone-700 dark:text-stone-200">{formatDateStringHeader(dateStr)}</span><div className="text-xs font-semibold text-stone-500 dark:text-stone-400 bg-white dark:bg-stone-900 px-2 py-1 rounded border border-stone-200 dark:border-stone-700">{historyLogs[dateStr].length} Recs</div></button>{(expandedDates[dateStr]) && <div className="divide-y divide-stone-100 dark:divide-stone-800 border-t border-stone-200 dark:border-stone-800">{historyLogs[dateStr].map(log => <AttendanceItem key={log.id} log={log} member={null} onEdit={() => setEditLogModal(log)} now={now} />)}</div>}</div>))}
            </div>
@@ -715,9 +526,10 @@ export default function App() {
                   {[...Array(TOTAL_SEATS)].map((_, i) => {
                      const seatNum = i + 1;
                      const seatOwners = getSeatOwners(seatNum);
+                     const activeLog = todaysLogs.find(l => !l.checkOutTime && l.seatNumber == seatNum);
+                     if (!seatOwners && activeLog) return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]"><span className="text-lg font-bold text-white drop-shadow-md">{seatNum}</span></div>);
                      if (!seatOwners) return (<div key={seatNum} className="aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 bg-white border-stone-200 dark:bg-stone-800 dark:border-stone-700 opacity-60"><span className="text-lg font-bold text-stone-300 dark:text-stone-600 mb-1">{seatNum}</span></div>);
                      const isCheckedIn = todaysLogs.some(l => !l.checkOutTime && l.seatNumber == seatNum);
-                     const isStaff = seatOwners.type === 'full' && seatOwners.member.type === 'Staff';
                      return (<div key={seatNum} className={`aspect-square rounded-xl p-2 flex flex-col items-center justify-center text-center border-2 transition-all ${isCheckedIn ? 'bg-[#c9db93] border-[#4a5d23] dark:bg-[#4a5d23]/40 dark:border-[#a3b86c]' : 'bg-stone-100'}`}><span className="text-lg font-bold">{seatNum}</span></div>);
                   })}
                </div>
