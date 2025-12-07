@@ -358,91 +358,39 @@ export default function App() {
   const updateMemberStatus = async (member, newStatus) => { if (newStatus === 'archived') await autoCheckOutMember(member.name); try { const collectionName = (member.type === 'Staff' || rosterTab === 'staff') ? 'staff' : 'members'; const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, member.id); const updates = { status: newStatus }; if (newStatus === 'archived') { updates.pendingRenewal = deleteField(); if (collectionName === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); updates.membershipEnd = Timestamp.fromDate(today); } if (member.assignedSeat) { updates.seatHistory = [{ seat: member.assignedSeat, leftAt: Timestamp.now() }, ...(member.seatHistory || [])]; updates.assignedSeat = null; } } else if (newStatus === 'active') { if (collectionName === 'staff') updates.membershipEnd = null; } await updateDoc(docRef, updates); setFeedback({ type: 'success', message: `Moved to ${newStatus === 'archived' ? 'Archive' : 'Active'} list.` }); } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } setTimeout(() => setFeedback(null), 3000); };
   const addToRoster = async () => { if (!newName.trim()) return; try { const collectionName = rosterTab === 'staff' ? 'staff' : 'members'; let initialStart = null; if (rosterTab === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); initialStart = Timestamp.fromDate(today); } const newDoc = { name: newName.trim(), type: rosterTab === 'staff' ? 'Staff' : newType, createdAt: serverTimestamp(), membershipStart: initialStart, membershipEnd: null, membershipHistory: [], seatHistory: [], status: 'active', currentStreak: 0, notes: newNotes, birthDate: newDob ? Timestamp.fromDate(new Date(newDob)) : null, isBlocked: false, assignedSeat: newSeat ? parseInt(newSeat) : null }; if (rosterTab === 'readers' && newType === 'Single Day') { const today = new Date(); today.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(today); newDoc.membershipEnd = Timestamp.fromDate(today); newDoc.duration = singleDayDuration; } else { if (newStartDate) { const d = new Date(newStartDate); d.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(d); } if (newEndDate) { const d = new Date(newEndDate); d.setHours(12, 0, 0, 0); newDoc.membershipEnd = Timestamp.fromDate(d); } } const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), newDoc); if (newPaymentAmount) await updateDoc(docRef, { payments: [{ amount: newPaymentAmount, method: newPaymentMethod, date: Timestamp.now(), type: 'Registration' }] }); setFeedback({ type: 'success', message: `Added to list.` }); setNewName(''); setNewStartDate(''); setNewEndDate(''); setNewSeat(''); setNewDob(''); setNewNotes(''); setNewPaymentAmount(''); setNewPaymentMethod('Cash'); } catch (e) { setFeedback({ type: 'error', message: 'Could not add person.' }); } setTimeout(() => setFeedback(null), 2000); };
   
-  // Settings/OTP Logic
-  const sendVerificationCode = async () => {
-    let targetEmail = appSettings.adminEmail || emailInput;
-    if (!targetEmail) { setFeedback({ type: 'error', message: 'No email provided' }); return; }
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setOtpCode(code);
-
-    // =========================================================================
-    // REPLACE VALUES BELOW WITH YOUR EMAILJS CREDENTIALS
-    // =========================================================================
-    const EMAILJS_SERVICE_ID = "service_yigkhv1"; 
-    const EMAILJS_TEMPLATE_ID = "template_qgw6fb6";
-    const EMAILJS_PUBLIC_KEY = "7GlbggyreBqe2txN9";
-    // =========================================================================
-
-    // 1. Simulation Mode (If keys are missing)
-    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID" || EMAILJS_SERVICE_ID.includes("YOUR_")) {
-        alert(`[SIMULATION MODE]\n\n(EmailJS keys are not configured in App.jsx)\n\nYour Verification Code is: ${code}`);
-        setOtpStep('verify');
+  // FIX: REPLACED EMAIL OTP LOGIC WITH DIRECT PIN VERIFICATION
+  const handleDirectUpdate = async () => {
+    // 1. Verify Current PIN
+    if (pinInput !== appSettings.adminPin) {
+        setFeedback({ type: 'error', message: 'Current PIN is incorrect' });
         return;
     }
-
-    setFeedback({ type: 'success', message: 'Sending code...' });
     
-    try {
-        const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                service_id: EMAILJS_SERVICE_ID,
-                template_id: EMAILJS_TEMPLATE_ID,
-                user_id: EMAILJS_PUBLIC_KEY,
-                template_params: { to_email: targetEmail, code: code, message: `Your Verification Code is: ${code}` }
-            })
-        });
-        
-        if (response.ok) { 
-            setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); 
-        } 
-        else { 
-            const errorText = await response.text();
-            console.error("EmailJS Error:", errorText);
-            // 2. Fallback Mode (If API fails)
-            alert(`[EMAIL FAILED]\nServer response: ${errorText}\n\nFallback Code: ${code}`);
-        }
-    } catch (error) {
-        console.error("Network Error:", error);
-        // 3. Network Error Fallback
-        alert(`[NETWORK ERROR]\nCould not connect to email server.\n\nFallback Code: ${code}`);
-    } finally {
-        // 4. ALWAYS ADVANCE TO VERIFY STEP
-        setOtpStep('verify');
+    // 2. Validate New Settings
+    if (newPin && newPin.length !== 4) {
+        setFeedback({ type: 'error', message: 'New PIN must be 4 digits' });
+        return;
     }
-  };
-
-  const handleOtpVerify = () => {
-      if (otpInput === otpCode) {
-          if (appSettings.adminEmail) {
-             setFeedback({ type: 'success', message: 'Verified! Please enter new PIN.' });
-             setOtpStep('change');
-             setPinInput('');
-             setEmailInput(appSettings.adminEmail); // Pre-fill email for editing
-          } else {
-             const saveConfig = async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { ...appSettings, adminEmail: emailInput }, { merge: true }); };
-             saveConfig();
-             setFeedback({ type: 'success', message: 'Email confirmed & saved!' });
-             setShowPinModal(false);
-             setIsAdmin(true);
-          }
-      } else {
-          setFeedback({ type: 'error', message: 'Invalid code' });
-      }
-  };
-
-  const saveSettings = async () => {
-    if (!newPin || newPin.length !== 4) { setFeedback({ type: 'error', message: 'PIN must be 4 digits' }); return; }
+    
+    const updates = {};
+    if (newPin) updates.adminPin = newPin;
+    if (emailInput) updates.adminEmail = emailInput;
+    
+    // 3. Save to Firebase
     try {
-        const emailToSave = emailInput || appSettings.adminEmail; // Use new input if provided, else keep old
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), { adminPin: newPin, adminEmail: emailToSave }, { merge: true });
-        setFeedback({ type: 'success', message: 'Settings updated!' });
-        setAdminEmail(emailToSave); // Update local state immediately
-        setShowSettingsModal(false); setOtpStep('request'); setOtpInput(''); setNewPin(''); setEmailInput('');
-    } catch(e) { setFeedback({ type: 'error', message: 'Failed to save settings' }); }
-    setTimeout(() => setFeedback(null), 3000);
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'config', 'settings'), updates, { merge: true });
+        setFeedback({ type: 'success', message: 'Settings saved successfully!' });
+        
+        // Update local state
+        setAppSettings(prev => ({ ...prev, ...updates }));
+        if (emailInput) setAdminEmail(emailInput);
+        
+        // Close Modal
+        setShowSettingsModal(false);
+        setPinInput(''); setNewPin(''); setEmailInput('');
+    } catch(e) {
+        setFeedback({ type: 'error', message: 'Failed to save settings' });
+    }
   };
   
   const downloadHistory = () => {
@@ -485,7 +433,7 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
              <button onClick={() => setShowSeatMapModal(true)} className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-full border border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"><Sofa size={16} className={activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-500 dark:text-stone-400"} /><span className={`text-sm font-bold ${activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-600 dark:text-stone-300"}`}>{activeSeatCount} / {TOTAL_SEATS}</span></button>
              <button type="button" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 dark:text-stone-400 transition-colors">{darkMode ? <Sun size={20} /> : <Moon size={20} />}</button>
-            {isAdmin && (<div className="flex items-center gap-2"><button type="button" onClick={() => { setShowSettingsModal(true); setOtpStep(appSettings.adminEmail ? 'request' : 'request'); }} className="flex items-center gap-1 text-xs font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1.5 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"><Settings size={14} /></button><button type="button" onClick={() => { setIsAdmin(false); setActiveTab('reader_kiosk'); }} className="flex items-center gap-1 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"><Lock size={14} /> Lock</button></div>)}
+            {isAdmin && (<div className="flex items-center gap-2"><button type="button" onClick={() => { setShowSettingsModal(true); setPinInput(''); setNewPin(''); setEmailInput(appSettings.adminEmail || ''); }} className="flex items-center gap-1 text-xs font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1.5 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"><Settings size={14} /></button><button type="button" onClick={() => { setIsAdmin(false); setActiveTab('reader_kiosk'); }} className="flex items-center gap-1 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"><Lock size={14} /> Lock</button></div>)}
             {!isAdmin && (<div className="text-stone-300 dark:text-stone-700"><Unlock size={16} /></div>)}
           </div>
         </div>
@@ -791,69 +739,64 @@ export default function App() {
         </div>
       )}
 
-      {/* FIX: ADDED MISSING SETTINGS MODAL WITH EMAIL/OTP FLOW */}
+      {/* REPLACED: NEW SIMPLIFIED SETTINGS MODAL (NO EMAIL VERIFICATION) */}
       {showSettingsModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[90%] max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
               <div className="p-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center">
                  <h3 className="font-bold text-stone-800 dark:text-white flex items-center gap-2"><Settings size={18} /> Admin Settings</h3>
-                 <button onClick={() => { setShowSettingsModal(false); setOtpStep('request'); setEmailInput(''); }} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
+                 <button onClick={() => { setShowSettingsModal(false); setPinInput(''); setNewPin(''); setEmailInput(''); }} className="text-stone-400 hover:text-stone-600"><X size={24} /></button>
               </div>
               <div className="p-6">
-                 {otpStep === 'request' && (
-                    <div className="text-center space-y-4">
-                       <div className="mx-auto w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-500"><ShieldCheck size={32} /></div>
-                       <h4 className="font-bold text-lg text-stone-800 dark:text-white">Verify Identity</h4>
-                       
-                       {appSettings.adminEmail ? (
-                           <>
-                             <p className="text-sm text-stone-500 dark:text-stone-400">To change settings, we need to verify it's you. Send a code to:</p>
-                             <div className="font-mono text-sm bg-stone-100 dark:bg-stone-800 py-2 rounded-lg text-stone-700 dark:text-stone-300">
-                                {appSettings.adminEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3")}
-                             </div>
-                             <button onClick={sendVerificationCode} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"><Mail size={16} /> Send Verification Code</button>
-                             {/* ADDED: Option to change email if the current one is wrong/inaccessible */}
-                             <button 
-                                onClick={() => setAppSettings({ ...appSettings, adminEmail: '' })} 
-                                className="text-xs text-stone-400 hover:text-blue-500 underline transition-colors"
-                             >
-                                Incorrect Email? Reset it here.
-                             </button>
-                           </>
-                       ) : (
-                           <>
-                             <p className="text-sm text-stone-500 dark:text-stone-400">No admin email set. Please set one to secure your account.</p>
-                             <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="Enter Admin Email" className="w-full px-3 py-3 border border-stone-200 dark:border-stone-700 rounded-xl outline-none focus:border-blue-500 dark:bg-stone-800 dark:text-white text-center" />
-                             <button onClick={sendVerificationCode} disabled={!emailInput} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">Send Verification Code</button>
-                           </>
-                       )}
+                 {/* Direct Form: No Email OTP Loop */}
+                 <div className="space-y-4">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-2">
+                       Enter your <strong>Current PIN</strong> to authorize changes.
                     </div>
-                 )}
-                 
-                 {otpStep === 'verify' && (
-                    <div className="text-center space-y-4">
-                        <h4 className="font-bold text-lg text-stone-800 dark:text-white">Enter OTP</h4>
-                        <p className="text-sm text-stone-500 dark:text-stone-400">Enter the 6-digit code sent to your email.</p>
-                        <input type="text" value={otpInput} onChange={(e) => setOtpInput(e.target.value)} maxLength={6} placeholder="000000" className="w-full px-3 py-3 border-2 border-stone-200 dark:border-stone-700 rounded-xl outline-none focus:border-blue-500 dark:bg-stone-800 dark:text-white text-center text-2xl font-mono tracking-widest" />
-                        <button onClick={handleOtpVerify} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors">Verify</button>
+                    
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Current PIN (Required)</label>
+                        <input 
+                            type="password" 
+                            value={pinInput} 
+                            onChange={(e) => setPinInput(e.target.value)} 
+                            maxLength={4} 
+                            placeholder="••••" 
+                            className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-stone-800 dark:focus:border-stone-500 dark:bg-stone-800 dark:text-white font-mono tracking-widest text-center" 
+                        />
                     </div>
-                 )}
 
-                 {otpStep === 'change' && (
-                    <div className="space-y-4">
-                        <div className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 p-3 rounded-lg text-xs font-bold text-center mb-4">Identity Verified</div>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Update Admin Email</label>
-                            {/* FIX: Removed the fallback to appSettings.adminEmail which prevented clearing the input */}
-                            <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-stone-500 uppercase mb-1">New PIN (4 Digits)</label>
-                            <input type="text" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={4} placeholder="e.g. 1234" className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white font-mono" />
-                        </div>
-                        <button onClick={saveSettings} className="w-full py-3 bg-[#4a5d23] text-white rounded-xl font-bold hover:bg-[#3b4a1c] transition-colors mt-2">Save Settings</button>
+                    <div className="pt-2 border-t border-stone-100 dark:border-stone-800">
+                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">New PIN (Optional)</label>
+                        <input 
+                            type="text" 
+                            value={newPin} 
+                            onChange={(e) => setNewPin(e.target.value)} 
+                            maxLength={4} 
+                            placeholder="Leave blank to keep current" 
+                            className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white font-mono" 
+                        />
                     </div>
-                 )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Recovery Email (Optional)</label>
+                        <input 
+                            type="email" 
+                            value={emailInput} 
+                            onChange={(e) => setEmailInput(e.target.value)} 
+                            placeholder={appSettings.adminEmail || "admin@example.com"}
+                            className="w-full px-3 py-2 border border-stone-200 dark:border-stone-700 rounded-lg outline-none focus:border-[#4a5d23] dark:bg-stone-800 dark:text-white" 
+                        />
+                    </div>
+
+                    <button 
+                        onClick={handleDirectUpdate} 
+                        className="w-full py-3 bg-[#4a5d23] text-white rounded-xl font-bold hover:bg-[#3b4a1c] transition-colors mt-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!pinInput || pinInput.length !== 4}
+                    >
+                        Save Changes
+                    </button>
+                 </div>
               </div>
            </div>
         </div>
