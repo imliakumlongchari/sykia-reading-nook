@@ -371,17 +371,18 @@ export default function App() {
     // =========================================================================
     const EMAILJS_SERVICE_ID = "service_yigkhv1"; 
     const EMAILJS_TEMPLATE_ID = "template_qgw6fb6";
-    const EMAILJS_PUBLIC_KEY = "eCcic3_qPYVX4H6gG";
+    const EMAILJS_PUBLIC_KEY = "7GlbggyreBqe2txN9";
     // =========================================================================
 
-    // 1. CHECK FOR PLACEHOLDERS (Restore this)
-    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID") {
-        alert(`[SIMULATION MODE]\n(Email keys not configured)\n\nYour Verification Code is: ${code}`);
+    // 1. Simulation Mode (If keys are missing)
+    if (EMAILJS_SERVICE_ID === "YOUR_SERVICE_ID" || EMAILJS_SERVICE_ID.includes("YOUR_")) {
+        alert(`[SIMULATION MODE]\n\n(EmailJS keys are not configured in App.jsx)\n\nYour Verification Code is: ${code}`);
         setOtpStep('verify');
         return;
     }
 
     setFeedback({ type: 'success', message: 'Sending code...' });
+    
     try {
         const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
             method: 'POST',
@@ -396,18 +397,19 @@ export default function App() {
         
         if (response.ok) { 
             setFeedback({ type: 'success', message: `Code sent to ${targetEmail}` }); 
-            setOtpStep('verify'); 
         } 
         else { 
             const errorText = await response.text();
             console.error("EmailJS Error:", errorText);
-            // 2. IMPROVE FALLBACK MESSAGE
-            alert(`[FALLBACK MODE]\nCould not connect to Email server.\n\nYour Verification Code is: ${code}`);
-            setOtpStep('verify');
+            // 2. Fallback Mode (If API fails)
+            alert(`[EMAIL FAILED]\nServer response: ${errorText}\n\nFallback Code: ${code}`);
         }
     } catch (error) {
-        console.error(error);
-        alert(`[FALLBACK MODE]\nCould not connect to Email server.\n\nYour Verification Code is: ${code}`);
+        console.error("Network Error:", error);
+        // 3. Network Error Fallback
+        alert(`[NETWORK ERROR]\nCould not connect to email server.\n\nFallback Code: ${code}`);
+    } finally {
+        // 4. ALWAYS ADVANCE TO VERIFY STEP
         setOtpStep('verify');
     }
   };
