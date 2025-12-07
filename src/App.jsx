@@ -150,7 +150,8 @@ export default function App() {
   const [members, setMembers] = useState([]);
   const [staff, setStaff] = useState([]); 
   const [logs, setLogs] = useState([]);
-  const [appSettings, setAppSettings] = useState({ adminPin: DEFAULT_PIN });
+  // Removed DEFAULT_PIN from settings, we just use the variable now
+  const [appSettings, setAppSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false); 
@@ -168,9 +169,8 @@ export default function App() {
   const [expandedDates, setExpandedDates] = useState({});
   // REMOVED: isAdmin state, security is now handled by direct access
   const [pinInput, setPinInput] = useState('');
-  const [showPinModal, setShowPinModal] = useState(false);
+  // REMOVED: showPinModal, targetTab as they are for authentication
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [targetTab, setTargetTab] = useState(null);
   const [newPin, setNewPin] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [emailInput, setEmailInput] = useState(''); 
@@ -193,9 +193,6 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   
   // Removed OTP states as they are no longer used for verification
-  // const [otpStep, setOtpStep] = useState('request'); 
-  // const [otpCode, setOtpCode] = useState('');
-  // const [otpInput, setOtpInput] = useState('');
 
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (darkMode) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); } }, [darkMode]);
