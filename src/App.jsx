@@ -166,14 +166,14 @@ export default function App() {
   const [historySearchQuery, setHistorySearchQuery] = useState(''); 
   const [historyFilter, setHistoryFilter] = useState('All');
   const [expandedDates, setExpandedDates] = useState({});
-  const [isAdmin, setIsAdmin] = useState(false);
+  // REMOVED: isAdmin state, security is now handled by direct access
   const [pinInput, setPinInput] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [targetTab, setTargetTab] = useState(null);
   const [newPin, setNewPin] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
-  const [emailInput, setEmailInput] = useState(''); // ADDED
+  const [emailInput, setEmailInput] = useState(''); 
   const [confirmModal, setConfirmModal] = useState(null); 
   const [deleteModal, setDeleteModal] = useState(null); 
   const [editLogModal, setEditLogModal] = useState(null);
@@ -192,10 +192,10 @@ export default function App() {
   const [newNotes, setNewNotes] = useState('');
   const [now, setNow] = useState(new Date());
   
-  // OTP States
-  const [otpStep, setOtpStep] = useState('request'); 
-  const [otpCode, setOtpCode] = useState('');
-  const [otpInput, setOtpInput] = useState('');
+  // Removed OTP states as they are no longer used for verification
+  // const [otpStep, setOtpStep] = useState('request'); 
+  // const [otpCode, setOtpCode] = useState('');
+  // const [otpInput, setOtpInput] = useState('');
 
   useEffect(() => { const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (darkMode) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); } }, [darkMode]);
@@ -232,15 +232,7 @@ export default function App() {
     } catch (e) { setLoading(false); }
   }, [user]);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    let timeoutId;
-    const lockApp = () => { setIsAdmin(false); setActiveTab('reader_kiosk'); setFeedback({ type: 'success', message: 'Admin locked due to inactivity 🔒' }); setTimeout(() => setFeedback(null), 3000); };
-    const resetTimer = () => { clearTimeout(timeoutId); timeoutId = setTimeout(lockApp, 120000); };
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
-    resetTimer(); events.forEach(e => window.addEventListener(e, resetTimer));
-    return () => { clearTimeout(timeoutId); events.forEach(e => window.removeEventListener(e, resetTimer)); };
-  }, [isAdmin]);
+  // REMOVED: Inactivity lock useEffect
 
   // --- Derived State ---
   const todayStr = getTodayString();
@@ -340,8 +332,9 @@ export default function App() {
   const sortedDates = useMemo(() => Object.keys(historyLogs).sort((a, b) => new Date(b) - new Date(a)), [historyLogs]);
 
   // Actions
-  const handleTabChange = (tab) => { if (tab === 'reader_kiosk') { setActiveTab(tab); return; } if (isAdmin) { setActiveTab(tab); } else { setTargetTab(tab); setShowPinModal(true); setPinInput(''); } };
-  const verifyPin = () => { if (pinInput == (appSettings.adminPin || DEFAULT_PIN)) { setIsAdmin(true); setShowPinModal(false); if (targetTab) setActiveTab(targetTab); setPinInput(''); } else { setFeedback({ type: 'error', message: 'Incorrect PIN' }); setPinInput(''); setTimeout(() => setFeedback(null), 1500); } };
+  // REMOVED PIN VERIFICATION FOR TAB ACCESS
+  const handleTabChange = (tab) => { setActiveTab(tab); };
+  // REMOVED: verifyPin logic
   const autoCheckOutMember = async (memberName) => { const activeLog = logs.find(l => l.memberName === memberName && l.dateString === todayStr && !l.checkOutTime); if (activeLog) { try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'attendance_logs', activeLog.id), { checkOutTime: serverTimestamp(), status: 'completed', autoCheckedOut: true }); } catch (e) {} } };
   const handlePersonClick = (person, category) => { if (person.isBlocked) { setFeedback({ type: 'error', message: 'Blocked.' }); setTimeout(() => setFeedback(null), 3000); return; } const map = category === 'staff' ? staffStatusMap : readerStatusMap; const statusObj = map[person.name]; openConfirmationModal(person, category, statusObj?.status === 'checked-in', statusObj?.logId, person.assignedSeat); };
   const openConfirmationModal = (person, category, isCheckedIn, logId, seatNumber = null) => { const now = new Date(); setManualTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`); setUseManualTime(false); setConfirmModal({ person, category, action: isCheckedIn ? 'Check Out' : 'Check In', logId, seatNumber }); };
@@ -358,10 +351,11 @@ export default function App() {
   const updateMemberStatus = async (member, newStatus) => { if (newStatus === 'archived') await autoCheckOutMember(member.name); try { const collectionName = (member.type === 'Staff' || rosterTab === 'staff') ? 'staff' : 'members'; const docRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, member.id); const updates = { status: newStatus }; if (newStatus === 'archived') { updates.pendingRenewal = deleteField(); if (collectionName === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); updates.membershipEnd = Timestamp.fromDate(today); } if (member.assignedSeat) { updates.seatHistory = [{ seat: member.assignedSeat, leftAt: Timestamp.now() }, ...(member.seatHistory || [])]; updates.assignedSeat = null; } } else if (newStatus === 'active') { if (collectionName === 'staff') updates.membershipEnd = null; } await updateDoc(docRef, updates); setFeedback({ type: 'success', message: `Moved to ${newStatus === 'archived' ? 'Archive' : 'Active'} list.` }); } catch (e) { setFeedback({ type: 'error', message: 'Action failed.' }); } setTimeout(() => setFeedback(null), 3000); };
   const addToRoster = async () => { if (!newName.trim()) return; try { const collectionName = rosterTab === 'staff' ? 'staff' : 'members'; let initialStart = null; if (rosterTab === 'staff') { const today = new Date(); today.setHours(12, 0, 0, 0); initialStart = Timestamp.fromDate(today); } const newDoc = { name: newName.trim(), type: rosterTab === 'staff' ? 'Staff' : newType, createdAt: serverTimestamp(), membershipStart: initialStart, membershipEnd: null, membershipHistory: [], seatHistory: [], status: 'active', currentStreak: 0, notes: newNotes, birthDate: newDob ? Timestamp.fromDate(new Date(newDob)) : null, isBlocked: false, assignedSeat: newSeat ? parseInt(newSeat) : null }; if (rosterTab === 'readers' && newType === 'Single Day') { const today = new Date(); today.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(today); newDoc.membershipEnd = Timestamp.fromDate(today); newDoc.duration = singleDayDuration; } else { if (newStartDate) { const d = new Date(newStartDate); d.setHours(12, 0, 0, 0); newDoc.membershipStart = Timestamp.fromDate(d); } if (newEndDate) { const d = new Date(newEndDate); d.setHours(12, 0, 0, 0); newDoc.membershipEnd = Timestamp.fromDate(d); } } const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), newDoc); if (newPaymentAmount) await updateDoc(docRef, { payments: [{ amount: newPaymentAmount, method: newPaymentMethod, date: Timestamp.now(), type: 'Registration' }] }); setFeedback({ type: 'success', message: `Added to list.` }); setNewName(''); setNewStartDate(''); setNewEndDate(''); setNewSeat(''); setNewDob(''); setNewNotes(''); setNewPaymentAmount(''); setNewPaymentMethod('Cash'); } catch (e) { setFeedback({ type: 'error', message: 'Could not add person.' }); } setTimeout(() => setFeedback(null), 2000); };
   
-  // FIX: REPLACED EMAIL OTP LOGIC WITH DIRECT PIN VERIFICATION
+  // Settings/OTP Logic
   const handleDirectUpdate = async () => {
     // 1. Verify Current PIN
-    if (pinInput !== appSettings.adminPin) {
+    const currentPin = appSettings.adminPin || DEFAULT_PIN;
+    if (pinInput !== currentPin) {
         setFeedback({ type: 'error', message: 'Current PIN is incorrect' });
         return;
     }
@@ -433,8 +427,8 @@ export default function App() {
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
              <button onClick={() => setShowSeatMapModal(true)} className="flex items-center gap-2 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-full border border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors cursor-pointer"><Sofa size={16} className={activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-500 dark:text-stone-400"} /><span className={`text-sm font-bold ${activeSeatCount >= TOTAL_SEATS ? "text-red-500" : "text-stone-600 dark:text-stone-300"}`}>{activeSeatCount} / {TOTAL_SEATS}</span></button>
              <button type="button" onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 dark:text-stone-400 transition-colors">{darkMode ? <Sun size={20} /> : <Moon size={20} />}</button>
-            {isAdmin && (<div className="flex items-center gap-2"><button type="button" onClick={() => { setShowSettingsModal(true); setPinInput(''); setNewPin(''); setEmailInput(appSettings.adminEmail || ''); }} className="flex items-center gap-1 text-xs font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1.5 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"><Settings size={14} /></button><button type="button" onClick={() => { setIsAdmin(false); setActiveTab('reader_kiosk'); }} className="flex items-center gap-1 text-xs font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"><Lock size={14} /> Lock</button></div>)}
-            {!isAdmin && (<div className="text-stone-300 dark:text-stone-700"><Unlock size={16} /></div>)}
+            {/* REMOVED ISADMIN CHECK, DIRECTLY OPENS SETTINGS */}
+            <button type="button" onClick={() => { setShowSettingsModal(true); setPinInput(''); setNewPin(''); setEmailInput(appSettings.adminEmail || ''); }} className="flex items-center gap-1 text-xs font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 px-2 py-1.5 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"><Settings size={14} /> Admin</button>
           </div>
         </div>
       </header>
@@ -443,9 +437,9 @@ export default function App() {
         {/* ... (Existing Tabs and Lists) ... */}
         <div className="flex gap-2 mb-6 p-1 bg-stone-100 dark:bg-stone-800 rounded-xl overflow-x-auto">
           <button type="button" onClick={() => handleTabChange('reader_kiosk')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'reader_kiosk' ? 'bg-white dark:bg-stone-700 text-[#4a5d23] dark:text-[#a3b86c] shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}><BookOpen size={18} /> Readers</button>
-          <button type="button" onClick={() => handleTabChange('staff_kiosk')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'staff_kiosk' ? 'bg-white dark:bg-stone-700 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}>{!isAdmin && <Lock size={14} className="opacity-50" />}<Briefcase size={18} /> Staff</button>
-          <button type="button" onClick={() => handleTabChange('roster')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'roster' ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-200 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}>{!isAdmin && <Lock size={14} className="opacity-50" />}<Users size={18} /> Roster</button>
-          <button type="button" onClick={() => handleTabChange('history')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-white dark:bg-stone-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}>{!isAdmin && <Lock size={14} className="opacity-50" />}<History size={18} /> History</button>
+          <button type="button" onClick={() => handleTabChange('staff_kiosk')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'staff_kiosk' ? 'bg-white dark:bg-stone-700 text-purple-600 dark:text-purple-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}><Briefcase size={18} /> Staff</button>
+          <button type="button" onClick={() => handleTabChange('roster')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'roster' ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-200 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}><Users size={18} /> Roster</button>
+          <button type="button" onClick={() => handleTabChange('history')} className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-white dark:bg-stone-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-stone-500 dark:text-stone-400'}`}><History size={18} /> History</button>
         </div>
 
         {(activeTab === 'reader_kiosk' || activeTab === 'staff_kiosk') && (
@@ -670,7 +664,7 @@ export default function App() {
                  <div className="relative flex-1 w-full">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-stone-400"><Search size={24} /></div>
                     <input type="text" placeholder="Search history..." value={historySearchQuery} onChange={(e) => setHistorySearchQuery(e.target.value)} className="w-full pl-12 pr-12 py-4 border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-[#4a5d23] transition-all text-base" />
-                    {historySearchQuery && <button onClick={() => setHistorySearchQuery('')} className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"><X size={20} /></button>}
+                    {historySearchQuery && <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-0 pr-4 flex items-center text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"><X size={20} /></button>}
                  </div>
                  {/* FIX: ADDED HISTORY FILTERS THAT WERE MISSING */}
                  <div className="flex bg-stone-200 dark:bg-stone-800 p-1 rounded-xl w-full sm:w-auto overflow-x-auto no-scrollbar">
@@ -751,7 +745,7 @@ export default function App() {
                  {/* Direct Form: No Email OTP Loop */}
                  <div className="space-y-4">
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-blue-700 dark:text-blue-300 mb-2">
-                       Enter your <strong>Current PIN</strong> to authorize changes.
+                       Enter your <strong>Current PIN</strong> (Hint: 1234) to authorize changes.
                     </div>
                     
                     <div>
@@ -803,7 +797,7 @@ export default function App() {
       )}
       
       {/* ... Other Modals ... */}
-      {showPinModal && (<div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in duration-200"><div className="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl w-[90%] max-w-xs overflow-hidden animate-in zoom-in-95 duration-200"><div className="p-6 text-center"><h3 className="text-xl font-bold text-stone-800 dark:text-white mb-4">Admin Access</h3><input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} maxLength={4} className="w-full text-center text-3xl font-mono tracking-[0.5em] py-3 border-2 border-stone-200 dark:border-stone-700 bg-white text-stone-900 dark:bg-stone-800 dark:text-white rounded-xl outline-none focus:border-stone-800 mb-6" placeholder="••••" autoFocus/><div className="grid grid-cols-2 gap-3"><button onClick={() => { setShowPinModal(false); setPinInput(''); }} className="py-3 font-bold text-stone-500 hover:bg-stone-50 dark:hover:bg-stone-800 rounded-xl">Cancel</button><button onClick={verifyPin} className="py-3 font-bold text-white bg-stone-800 hover:bg-stone-900 rounded-xl shadow-lg">Unlock</button></div></div></div></div>)}
+      {/* REMOVED PIN MODAL COMPONENT */}
 
       {/* FIX: RESTORED CONFIRM MODAL WITH Z-INDEX > 200 AND CORRECT ACTION BUTTONS */}
       {confirmModal && (
@@ -835,7 +829,7 @@ export default function App() {
               <div className="p-6 text-center">
                  <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 text-red-500"><Trash2 size={32} /></div>
                  <h3 className="text-xl font-bold text-stone-800 dark:text-white mb-2">Delete Member?</h3>
-                 <p className="text-stone-500 dark:text-stone-400 mb-6">Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.</p>
+                 <p className="text-center text-stone-500 dark:text-stone-400 mb-6">Are you sure you want to delete <strong>{deleteModal.name}</strong>? This action cannot be undone.</p>
                  <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => setDeleteModal(null)} className="py-3 font-bold text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors">Cancel</button>
                     <button onClick={executeDeletePerson} className="py-3 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg transition-colors">Delete</button>
